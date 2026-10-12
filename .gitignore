@@ -72,4 +72,6 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+output/
+seen_posts.json
 data-pipeline/output/*.json
