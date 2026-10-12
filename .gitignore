@@ -65,10 +65,11 @@ Thumbs.db
 *.swp
 *.swo
 
-# Logs
+# Logs & Pipeline Outputs
 logs
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+data-pipeline/output/*.json
