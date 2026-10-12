@@ -93,13 +93,93 @@ class RedditClient:
 
             time.sleep(0.5)
 
-        # If zero posts were returned due to Reddit blocking or missing credentials, provide friendly fallback
+        # If zero posts were returned via JSON, try live RSS search for each subreddit
         if not all_posts and not self._praw_instance:
-            logger.info("Official Reddit credentials not configured and public API endpoint was blocked. Generating representative demo posts.")
+            logger.info("JSON API returned 0 posts. Attempting live Reddit RSS search...")
+            for sub in target_subs:
+                try:
+                    rss_posts = self._fetch_via_rss_search(sub, query, limit_per_sub)
+                    for p in rss_posts:
+                        if p["id"] not in seen_ids:
+                            seen_ids.add(p["id"])
+                            all_posts.append(p)
+                except Exception as e:
+                    logger.warning(f"RSS search failed for r/{sub}: {e}")
+                time.sleep(0.5)
+
+        # If still zero posts, provide demo posts
+        if not all_posts and not self._praw_instance:
+            logger.info("Reddit endpoints unavailable. Generating representative demo posts.")
             return self._generate_mock_posts(query, target_subs, limit_per_sub)
 
         logger.info(f"Retrieved {len(all_posts)} unique posts across {target_subs} for query '{query}'")
         return all_posts
+
+    def _fetch_via_rss_search(
+        self,
+        subreddit_name: str,
+        query: str,
+        limit: int
+    ) -> List[Dict[str, Any]]:
+        """Fetch live subreddit posts via Reddit's public Atom/RSS search feed."""
+        import xml.etree.ElementTree as ET
+        import urllib.parse
+        import urllib.request
+        import html
+        import re
+
+        q_encoded = urllib.parse.quote(query)
+        url = f"https://www.reddit.com/r/{subreddit_name}/search.rss?q={q_encoded}&restrict_sr=1&sort=new"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+            "Accept": "application/xml,text/xml,*/*"
+        }
+        try:
+            req = urllib.request.Request(url, headers=headers)
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                if resp.status != 200:
+                    return []
+                content = resp.read()
+                root = ET.fromstring(content)
+
+            ns = {"atom": "http://www.w3.org/2005/Atom"}
+            results = []
+            for entry in root.findall("atom:entry", ns)[:limit]:
+                title_elem = entry.find("atom:title", ns)
+                id_elem = entry.find("atom:id", ns)
+                link_elem = entry.find("atom:link", ns)
+                pub_elem = entry.find("atom:published", ns)
+                content_elem = entry.find("atom:content", ns)
+
+                title = title_elem.text if title_elem is not None and title_elem.text else "Untitled"
+                post_id = id_elem.text if id_elem is not None and id_elem.text else ""
+                link = link_elem.attrib.get("href", "") if link_elem is not None else ""
+                pub = pub_elem.text if pub_elem is not None and pub_elem.text else ""
+
+                body = ""
+                if content_elem is not None and content_elem.text:
+                    body = re.sub(r"<[^>]+>", " ", content_el.text if 'content_el' in locals() else content_elem.text)
+                    body = html.unescape(body)
+                    body = re.sub(r"\s+", " ", body).strip()
+                    if len(body) > 1500:
+                        body = body[:1500] + "... [truncated]"
+
+                results.append({
+                    "id": post_id,
+                    "subreddit": subreddit_name,
+                    "title": title,
+                    "url": link,
+                    "permalink": link,
+                    "published_at": pub,
+                    "score": 0,
+                    "num_comments": 0,
+                    "upvote_ratio": 1.0,
+                    "content_text": body
+                })
+            return results
+        except Exception as e:
+            logger.warning(f"Error fetching RSS search for r/{subreddit_name}: {e}")
+            return []
 
     def _generate_mock_posts(
         self,
