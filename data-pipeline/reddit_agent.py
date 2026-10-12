@@ -14,19 +14,34 @@ from pathlib import Path
 from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
 
-# Load local environment variables from root or local .env if python-dotenv is installed
-try:
-    from dotenv import load_dotenv
-    root_env = Path(__file__).resolve().parent.parent / ".env"
-    local_env = Path(__file__).resolve().parent / ".env"
-    if root_env.exists():
-        load_dotenv(root_env)
-    elif local_env.exists():
-        load_dotenv(local_env)
-    else:
-        load_dotenv()
-except ImportError:
-    pass
+# Load local environment variables
+def _load_env_file():
+    try:
+        from dotenv import load_dotenv
+        for p in [Path(__file__).resolve().parent.parent / ".env", Path(__file__).resolve().parent / ".env", Path(".env")]:
+            if p.exists():
+                load_dotenv(p)
+                return
+    except ImportError:
+        pass
+    
+    # Standard library fallback if python-dotenv is not installed
+    for p in [Path(__file__).resolve().parent.parent / ".env", Path(__file__).resolve().parent / ".env", Path(".env")]:
+        if p.exists():
+            try:
+                with open(p, "r", encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip()
+                        if line and not line.startswith("#") and "=" in line:
+                            k, v = line.split("=", 1)
+                            k = k.strip()
+                            v = v.strip().strip('"').strip("'")
+                            if k not in os.environ:
+                                os.environ[k] = v
+            except Exception:
+                pass
+
+_load_env_file()
 
 # Add parent directory to sys.path to allow imports from src
 current_dir = Path(__file__).resolve().parent
