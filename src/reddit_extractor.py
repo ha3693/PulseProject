@@ -75,9 +75,17 @@ def fetch_user_submissions(
                 "error": f"Reddit user 'u/{clean_username}' was not found (account may not exist or is deleted)."
             }
         elif response.status_code == 403:
-            logger.warning(f"Received HTTP 403 for u/{clean_username}. Providing fallback demo posts for testing.")
+            logger.info(f"Reddit .json endpoint returned HTTP 403. Automatically falling back to live public RSS feed for u/{clean_username}...")
+            rss_result = _fetch_via_rss(clean_username, limit=limit, user_agent=user_agent, max_body_chars=max_body_chars)
+            if rss_result and rss_result.get("success") and rss_result.get("posts"):
+                return rss_result
+            logger.warning(f"Live RSS fetch failed for u/{clean_username}. Providing fallback demo posts.")
             return _generate_mock_user_posts(clean_username, limit, note="Simulated fallback (Reddit returned HTTP 403 Blocked)")
         elif response.status_code == 429:
+            logger.info(f"Reddit .json endpoint rate limited (429). Falling back to live public RSS feed...")
+            rss_result = _fetch_via_rss(clean_username, limit=limit, user_agent=user_agent, max_body_chars=max_body_chars)
+            if rss_result and rss_result.get("success") and rss_result.get("posts"):
+                return rss_result
             return {
                 "success": False,
                 "username": clean_username,
@@ -171,6 +179,89 @@ def fetch_user_submissions(
             "posts": [],
             "error": str(exc)
         }
+
+
+def _clean_html_text(html_content: str) -> str:
+    """Strip basic HTML tags and unescape entities."""
+    import html
+    import re
+    clean = re.sub(r"<[^>]+>", " ", html_content)
+    clean = html.unescape(clean)
+    clean = re.sub(r"\s+", " ", clean).strip()
+    return clean
+
+
+def _fetch_via_rss(
+    username: str,
+    limit: int = 10,
+    user_agent: str = DEFAULT_USER_AGENT,
+    max_body_chars: int = 1000
+) -> Optional[Dict[str, Any]]:
+    """Fetch live submissions from Reddit's public Atom/RSS feed when .json is blocked."""
+    import xml.etree.ElementTree as ET
+    from datetime import datetime
+    
+    url = f"https://www.reddit.com/user/{username}/submitted.rss"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+    }
+
+    try:
+        resp = requests.get(url, headers=headers, timeout=10)
+        if resp.status_code != 200:
+            logger.warning(f"Reddit RSS endpoint returned status {resp.status_code}")
+            return None
+
+        root = ET.fromstring(resp.content)
+        ns = {"atom": "http://www.w3.org/2005/Atom"}
+        posts = []
+
+        for entry in root.findall("atom:entry", ns)[:limit]:
+            title_elem = entry.find("atom:title", ns)
+            id_elem = entry.find("atom:id", ns)
+            link_elem = entry.find("atom:link", ns)
+            cat_elem = entry.find("atom:category", ns)
+            published_elem = entry.find("atom:published", ns)
+            content_elem = entry.find("atom:content", ns)
+
+            title = title_elem.text if title_elem is not None and title_elem.text else "Untitled"
+            post_id = id_elem.text if id_elem is not None and id_elem.text else ""
+            permalink = link_elem.attrib.get("href", "") if link_elem is not None else ""
+            subreddit = cat_elem.attrib.get("label", "r/unknown") if cat_elem is not None else "r/unknown"
+            published_at = published_elem.text if published_elem is not None and published_elem.text else ""
+
+            body = ""
+            if content_elem is not None and content_elem.text:
+                body = _clean_html_text(content_elem.text)
+                if len(body) > max_body_chars:
+                    body = body[:max_body_chars] + "... [truncated]"
+
+            posts.append({
+                "id": post_id,
+                "title": title,
+                "subreddit": subreddit,
+                "created_utc": 0.0,
+                "created_at": published_at,
+                "permalink": permalink,
+                "external_url": permalink,
+                "body": body,
+                "score": 0,
+                "num_comments": 0,
+                "is_self": True,
+            })
+
+        logger.info(f"Successfully retrieved {len(posts)} LIVE submissions for u/{username} via RSS feed.")
+        return {
+            "success": True,
+            "username": username,
+            "posts": posts,
+            "error": None
+        }
+
+    except Exception as e:
+        logger.warning(f"Error parsing Reddit RSS for u/{username}: {e}")
+        return None
 
 
 def _generate_mock_user_posts(
