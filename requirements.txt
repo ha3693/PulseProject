@@ -11,3 +11,8 @@ langchain-openai>=0.1.0
 
 # Optional providers
 langchain-google-genai>=1.0.0
+
+# Yahoo Finance & Market Feeds
+yfinance>=0.2.36
+curl_cffi>=0.7.0
+beautifulsoup4>=4.11.1

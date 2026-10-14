@@ -68,17 +68,35 @@ PulseProject/
 ├── .gitignore                # Comprehensive ignore rules (Node, Python, Supabase, OS)
 ├── CONTRIBUTING.md           # Branching strategy, commit conventions, code reviews
 ├── README.md                 # Project vision, architecture, and overview
+├── main.py                   # Master agent dispatcher CLI
+├── agents/                   # Unified Intelligence Agents Package
+│   ├── __init__.py           # Agent registry and factory (get_agent)
+│   ├── base.py               # BaseAgent class (common LLM setup, persistence)
+│   ├── schemas.py            # Unified Pydantic schemas (SignalReport, PostItem)
+│   ├── cli.py                # Unified CLI runner (python -m agents.cli ...)
+│   ├── yahoo_finance/        # Yahoo Finance EOD Feeds & News Agent
+│   │   ├── __init__.py
+│   │   ├── agent.py          # YahooFinanceAgent implementation
+│   │   └── extractor.py      # EOD feed, quotes & snippet extractor
+│   └── reddit/               # Reddit Sentiment & Signal Agents
+│       ├── __init__.py
+│       ├── market_agent.py   # RedditMarketAgent (r/investing, r/stocks, r/wsb)
+│       ├── user_agent.py     # RedditUserAgent (user tracking, e.g. u/OpenAI)
+│       ├── client.py         # Reddit client with OAuth & public API fallbacks
+│       ├── user_extractor.py # Reddit user submissions extractor
+│       └── deduplicator.py   # PostDeduplicator for seen_posts.json
 ├── docs/                     # Architectural and data source specifications
 │   ├── ARCHITECTURE.md       # High-level architecture and algorithm design
 │   └── DATA_SOURCES.md       # API limits, data privacy, and source compliance
 ├── frontend/                 # Next.js web application
 │   └── .gitkeep
-├── data-pipeline/            # Python data ingestion, scoring & backtesting engine
+├── data-pipeline/            # Data pipeline tools and runners
 │   ├── requirements.txt      # Python dependencies (yfinance, pandas, transformers, etc.)
-│   └── src/
-│       └── .gitkeep
+│   ├── reddit_agent.py       # Pipeline runner for Reddit Market agent
+│   └── yahoo_finance_agent.py# Pipeline runner for Yahoo Finance agent
+├── output/                   # Generated JSON market signals & reports
 └── supabase/                 # Supabase configuration & database migrations
-    ├── schema.sql            # Database schema draft (topics, raw_content, signals)
+    ├── schema.sql            # Database schema (topics, raw_content, signals)
     └── migrations/
         └── .gitkeep
 ```

@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """
-Pulse Platform - Reddit User AI News Monitoring Agent
-Entry point: Fetches recent submissions from a target Reddit user via Reddit's public endpoint
-(no OAuth / API keys needed) and generates an executive summary using LangChain.
+Pulse Platform - Master Agent Dispatcher.
+Executes any Pulse agent across Yahoo Finance EOD feeds, Reddit Market subreddits, or Reddit User tracking.
 """
 
 import sys
@@ -14,34 +13,50 @@ root_dir = Path(__file__).resolve().parent
 if str(root_dir) not in sys.path:
     sys.path.insert(0, str(root_dir))
 
-from src.agent import RedditUserNewsAgent
-from src.deduplicator import PostDeduplicator
+from agents.cli import run_yahoo, run_reddit, run_reddit_user
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Pulse Reddit User News Monitoring Agent (No OAuth / API Keys Required)"
+        description="Pulse Market Intelligence & Sentiment Agent System",
+        formatter_class=argparse.RawTextHelpFormatter,
     )
     parser.add_argument(
-        "--user",
-        "-u",
+        "--agent",
+        "-a",
         type=str,
-        default="OpenAI",
-        help="Target Reddit username to track (e.g. 'OpenAI', 'sama', 'spez')"
+        default=None,
+        choices=["yahoo", "reddit", "reddit-user"],
+        help="Agent to run:\n  'yahoo': Yahoo Finance EOD feeds & news\n  'reddit': Reddit financial subreddits (r/investing, r/stocks, r/wsb)\n  'reddit-user': Reddit user profile monitoring"
     )
     parser.add_argument(
         "--topic",
         "-t",
         type=str,
         default=None,
-        help="Optional news topic or focus area to filter and prioritize (e.g. 'AI', 'GPT', 'safety')"
+        help="Asset ticker, commodity, or brand query (e.g. 'NVDA', 'Gold', 'Nike', 'AAPL')"
+    )
+    parser.add_argument(
+        "--user",
+        "-u",
+        type=str,
+        default=None,
+        help="Target Reddit username to track (e.g. 'OpenAI', 'sama', 'spez')"
+    )
+    parser.add_argument(
+        "--window",
+        "-w",
+        type=str,
+        default="day",
+        choices=["24h", "day", "week", "month"],
+        help="Time window evaluated (default: 'day')"
     )
     parser.add_argument(
         "--limit",
         "-l",
         type=int,
-        default=10,
-        help="Number of recent submissions to retrieve (default: 10)"
+        default=6,
+        help="Maximum posts or news articles to retrieve (default: 6)"
     )
     parser.add_argument(
         "--output",
@@ -53,74 +68,48 @@ def main():
     parser.add_argument(
         "--all",
         action="store_true",
-        help="Analyze all fetched posts, bypassing seen_posts.json deduplication"
+        help="Bypass deduplication cache (reddit-user agent)"
     )
     parser.add_argument(
         "--clear-seen",
         action="store_true",
-        help="Clear the seen posts cache before running"
+        help="Clear seen_posts.json deduplication cache"
     )
     parser.add_argument(
         "--mock",
         action="store_true",
-        help="Use realistic demo submissions (useful for offline testing or demo)"
+        help="Run using representative synthetic data (offline / test mode)"
     )
 
     args = parser.parse_args()
 
     # Clear seen posts if requested
     if args.clear_seen:
+        from agents.reddit.deduplicator import PostDeduplicator
         dedup = PostDeduplicator()
         dedup.clear()
         print("🧹 Cleared seen_posts.json cache.")
 
-    print(f"\n🔍 Tracking Reddit submissions for u/{args.user}...")
-    if args.topic:
-        print(f"🎯 Focus topic: '{args.topic}'")
+    # Determine default agent based on arguments provided
+    selected_agent = args.agent
+    if not selected_agent:
+        if args.user:
+            selected_agent = "reddit-user"
+        else:
+            selected_agent = "yahoo"
 
-    agent = RedditUserNewsAgent()
-    result = agent.run(
-        username=args.user,
-        topic=args.topic,
-        limit=args.limit,
-        only_new=not args.all,
-        output_file=args.output,
-        use_mock=args.mock
-    )
+    # Set default topic if not supplied
+    if not args.topic:
+        args.topic = "NVDA" if selected_agent != "reddit-user" else None
 
-    print("\n" + "=" * 65)
-    print(f"📰 PULSE EXECUTIVE SUMMARY: u/{result.get('target_user')}")
-    print("=" * 65)
-    print(f"• Generated At:         {result.get('generated_at')}")
-    print(f"• Total Posts Fetched:  {result.get('total_posts_fetched')}")
-    print(f"• New Posts Analyzed:   {result.get('new_posts_analyzed')}")
-    print(f"• Sentiment Signal:     {result.get('sentiment_signal', 'N/A').upper()}")
-    
-    if result.get("key_themes"):
-        print(f"• Key Themes:           {', '.join(result.get('key_themes'))}")
-    
-    print("-" * 65)
-    print(f"Executive Synthesis:\n{result.get('executive_summary')}")
-    print("-" * 65)
-
-    milestones = result.get("announcements_and_milestones", [])
-    if milestones:
-        print("📌 Key Announcements & Milestones:")
-        for m in milestones:
-            print(f"  - {m}")
-        print("-" * 65)
-
-    posts = result.get("posts", [])
-    if posts:
-        print(f"📋 Analyzed Posts ({len(posts)}):")
-        for idx, p in enumerate(posts[:5], 1):
-            print(f"  {idx}. [{p.get('subreddit')}] {p.get('title')}")
-            print(f"     URL: {p.get('permalink')}")
-            if p.get("summary"):
-                print(f"     Takeaway: {p.get('summary')}")
-        if len(posts) > 5:
-            print(f"  ... and {len(posts) - 5} more in the output JSON file.")
-    print("=" * 65 + "\n")
+    if selected_agent == "yahoo":
+        run_yahoo(args)
+    elif selected_agent == "reddit":
+        args.window = "week" if args.window == "day" else args.window
+        run_reddit(args)
+    elif selected_agent == "reddit-user":
+        args.user = args.user or "OpenAI"
+        run_reddit_user(args)
 
 
 if __name__ == "__main__":
