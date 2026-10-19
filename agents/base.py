@@ -7,7 +7,7 @@ import logging
 from abc import ABC, abstractmethod
 from pathlib import Path
 from datetime import datetime, timezone
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 
 logger = logging.getLogger("PulseBaseAgent")
 
@@ -106,6 +106,28 @@ class BaseAgent(ABC):
             self.output_dir = Path(__file__).resolve().parent.parent / "output"
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.llm = get_llm()
+        self._finbert = None
+
+    @property
+    def finbert(self):
+        """Lazy access to the Hugging Face FinBERT financial domain scorer."""
+        if self._finbert is None:
+            try:
+                from agents.finbert import get_finbert_scorer
+                self._finbert = get_finbert_scorer()
+            except Exception as e:
+                logger.warning(f"Failed to load FinBERT: {e}")
+                self._finbert = None
+        return self._finbert
+
+    def score_posts_with_finbert(self, posts: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Run Hugging Face FinBERT sequence classification across a list of posts."""
+        if self.finbert and self.finbert.is_loaded:
+            try:
+                return self.finbert.score_posts(posts)
+            except Exception as e:
+                logger.warning(f"FinBERT scoring encountered error: {e}")
+        return posts
 
     @abstractmethod
     def run(self, *args, **kwargs) -> Dict[str, Any]:

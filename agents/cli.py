@@ -17,6 +17,10 @@ from agents import (
     YahooFinanceAgent,
     RedditMarketAgent,
     RedditUserAgent,
+    StockTwitsMarketAgent,
+    StockTwitsUserAgent,
+    BlueskyMarketAgent,
+    BlueskyUserAgent,
 )
 
 
@@ -54,9 +58,62 @@ def run_reddit_user(args):
         output_file=args.output,
         use_mock=args.mock,
     )
+    _print_user_report("Reddit", f"u/{result.get('target_user')}", result)
 
+
+def run_stocktwits(args):
+    agent = StockTwitsMarketAgent()
+    result = agent.run(
+        topic=args.topic,
+        time_window=args.window,
+        limit=args.limit,
+        output_file=args.output,
+        use_mock=args.mock,
+    )
+    _print_signal_report("StockTwits Retail Sentiment", result)
+
+
+def run_stocktwits_user(args):
+    agent = StockTwitsUserAgent()
+    result = agent.run(
+        username=args.user,
+        topic=args.topic,
+        limit=args.limit,
+        only_new=not args.all,
+        output_file=args.output,
+        use_mock=args.mock,
+    )
+    _print_user_report("StockTwits", f"@{result.get('target_user')}", result)
+
+
+def run_bluesky(args):
+    agent = BlueskyMarketAgent()
+    result = agent.run(
+        topic=args.topic,
+        time_window=args.window,
+        limit=args.limit,
+        output_file=args.output,
+        use_mock=args.mock,
+    )
+    _print_signal_report("Bluesky Social Signal", result)
+
+
+def run_bluesky_user(args):
+    agent = BlueskyUserAgent()
+    result = agent.run(
+        username=args.user,
+        topic=args.topic,
+        limit=args.limit,
+        only_new=not args.all,
+        output_file=args.output,
+        use_mock=args.mock,
+    )
+    _print_user_report("Bluesky", f"@{result.get('target_user')}", result)
+
+
+def _print_user_report(platform_label: str, target_handle: str, result: dict):
     print("\n" + "=" * 65)
-    print(f"📰 PULSE EXECUTIVE SUMMARY: u/{result.get('target_user')}")
+    print(f"📰 PULSE EXECUTIVE SUMMARY ({platform_label}): {target_handle}")
     print("=" * 65)
     print(f"• Generated At:         {result.get('generated_at')}")
     print(f"• Total Posts Fetched:  {result.get('total_posts_fetched')}")
@@ -64,6 +121,10 @@ def run_reddit_user(args):
     print(f"• Sentiment Signal:     {str(result.get('sentiment_signal', 'N/A')).upper()}")
     if result.get("key_themes"):
         print(f"• Key Themes:           {', '.join(result.get('key_themes'))}")
+    if result.get("announcements_and_milestones"):
+        print("• Key Milestones:")
+        for m in result.get("announcements_and_milestones")[:3]:
+            print(f"    - {m}")
     print("-" * 65)
     print(f"Executive Synthesis:\n{result.get('executive_summary')}")
     print("=" * 65 + "\n")
@@ -74,6 +135,11 @@ def _print_signal_report(source_label: str, result: dict):
     print(f"📊 Pulse {source_label} Report for: {result.get('topic')}")
     print(f"Index Score: {result.get('aggregate_sentiment_score')} (-100 to +100)")
     print(f"Breakdown: {result.get('sentiment_breakdown')}")
+    if result.get("finbert_aggregate_score") is not None:
+        fb_score = result.get("finbert_aggregate_score")
+        fb_bd = result.get("finbert_breakdown", {})
+        print(f"• FinBERT Model Score:  {fb_score:+.1f} (-100 to +100) | {fb_bd}")
+        print(f"• Scoring Engine:       {result.get('scoring_engine', 'hybrid (FinBERT + LLM)')}")
     print(f"Posts Scanned: {result.get('total_posts_retrieved')} | Relevant: {result.get('relevant_posts_count')}")
     print("=" * 65)
 
@@ -114,7 +180,12 @@ def _print_signal_report(source_label: str, result: dict):
             sent = p.get("sentiment_label", "neutral").upper()
             score = p.get("sentiment_score", 0.0)
             rel = "✓" if p.get("is_relevant", True) else "✗"
-            print(f"  {idx}. [{rel} {sent} {score:+0.1f}] {p.get('title')}")
+            fb_info = ""
+            if p.get("finbert_score") is not None:
+                fb_label = str(p.get("finbert_label", "")).upper()
+                fb_score = p.get("finbert_score", 0.0)
+                fb_info = f" | FinBERT: {fb_label} {fb_score:+0.1f}"
+            print(f"  {idx}. [{rel} {sent} {score:+0.1f}{fb_info}] {p.get('title')}")
             print(f"     Source: {p.get('subreddit')} | URL: {p.get('url')}")
             if p.get("relevance_reason"):
                 print(f"     Reason: {p.get('relevance_reason')}")
@@ -155,6 +226,44 @@ def main():
     user_parser.add_argument("--output", "-o", type=str, default=None, help="Custom output JSON filepath")
     user_parser.add_argument("--mock", action="store_true", help="Run with representative mock data")
     user_parser.set_defaults(func=run_reddit_user)
+
+    # StockTwits Market Agent subparser
+    st_parser = subparsers.add_parser("stocktwits", help="StockTwits Retail Sentiment Signal Agent")
+    st_parser.add_argument("--topic", "-t", type=str, default="NVDA", help="Stock ticker (e.g. 'NVDA', 'AAPL', 'TSLA')")
+    st_parser.add_argument("--window", "-w", type=str, default="day", choices=["24h", "day", "week", "month"])
+    st_parser.add_argument("--limit", "-l", type=int, default=20, help="Max messages to retrieve (max 30)")
+    st_parser.add_argument("--output", "-o", type=str, default=None, help="Custom output JSON filepath")
+    st_parser.add_argument("--mock", action="store_true", help="Run with representative mock data")
+    st_parser.set_defaults(func=run_stocktwits)
+
+    # StockTwits User Agent subparser
+    st_user_parser = subparsers.add_parser("stocktwits-user", help="StockTwits User/Trader Monitoring Agent")
+    st_user_parser.add_argument("--user", "-u", type=str, default="howardlindzon", help="Target StockTwits username")
+    st_user_parser.add_argument("--topic", "-t", type=str, default=None, help="Optional asset or keyword filter")
+    st_user_parser.add_argument("--limit", "-l", type=int, default=15, help="Max messages to retrieve")
+    st_user_parser.add_argument("--all", action="store_true", help="Analyze all messages bypassing deduplication")
+    st_user_parser.add_argument("--output", "-o", type=str, default=None, help="Custom output JSON filepath")
+    st_user_parser.add_argument("--mock", action="store_true", help="Run with representative mock data")
+    st_user_parser.set_defaults(func=run_stocktwits_user)
+
+    # Bluesky Market Agent subparser
+    bsky_parser = subparsers.add_parser("bluesky", help="Bluesky Social & Tech Market Signal Agent")
+    bsky_parser.add_argument("--topic", "-t", type=str, default="NVDA", help="Topic, ticker, or brand (e.g. 'NVDA', 'Nike', 'AI')")
+    bsky_parser.add_argument("--window", "-w", type=str, default="week", choices=["24h", "day", "week", "month"])
+    bsky_parser.add_argument("--limit", "-l", type=int, default=15, help="Max posts to retrieve")
+    bsky_parser.add_argument("--output", "-o", type=str, default=None, help="Custom output JSON filepath")
+    bsky_parser.add_argument("--mock", action="store_true", help="Run with representative mock data")
+    bsky_parser.set_defaults(func=run_bluesky)
+
+    # Bluesky User Agent subparser
+    bsky_user_parser = subparsers.add_parser("bluesky-user", help="Bluesky Account Monitoring Agent")
+    bsky_user_parser.add_argument("--user", "-u", type=str, default="bsky.app", help="Target Bluesky handle (e.g. 'bsky.app', 'openai.com')")
+    bsky_user_parser.add_argument("--topic", "-t", type=str, default=None, help="Optional keyword filter")
+    bsky_user_parser.add_argument("--limit", "-l", type=int, default=15, help="Max posts to retrieve")
+    bsky_user_parser.add_argument("--all", action="store_true", help="Analyze all posts bypassing deduplication")
+    bsky_user_parser.add_argument("--output", "-o", type=str, default=None, help="Custom output JSON filepath")
+    bsky_user_parser.add_argument("--mock", action="store_true", help="Run with representative mock data")
+    bsky_user_parser.set_defaults(func=run_bluesky_user)
 
     args = parser.parse_args()
     args.func(args)

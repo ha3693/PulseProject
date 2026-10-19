@@ -108,7 +108,11 @@ class YahooFinanceAgent(BaseAgent):
             self.save_report(out_dict, clean_topic, prefix="yahoo_news", output_file=output_file)
             return out_dict
 
-        # Step 2: LangChain Analysis or Heuristic Engine
+        # Step 2: Ingest FinBERT Financial Domain Scoring
+        news_items = self.score_posts_with_finbert(news_items)
+        finbert_stats = self.finbert.compute_aggregate(news_items) if (self.finbert and self.finbert.is_loaded) else None
+
+        # Step 3: LangChain Analysis or FinBERT Engine
         if self.llm:
             report_dict = self._process_with_langchain(
                 topic=clean_topic,
@@ -117,10 +121,11 @@ class YahooFinanceAgent(BaseAgent):
                 market_data=market_data,
                 news_items=news_items,
                 time_window=time_window,
-                sources=sources
+                sources=sources,
+                finbert_stats=finbert_stats,
             )
         else:
-            logger.info("Running deterministic heuristic scoring engine.")
+            logger.info("Running FinBERT sequence classification scoring engine.")
             report_dict = self._process_heuristic(
                 topic=clean_topic,
                 symbol=symbol,
@@ -128,7 +133,8 @@ class YahooFinanceAgent(BaseAgent):
                 market_data=market_data,
                 news_items=news_items,
                 time_window=time_window,
-                sources=sources
+                sources=sources,
+                finbert_stats=finbert_stats,
             )
 
         saved_path = self.save_report(report_dict, clean_topic, prefix="yahoo_news", output_file=output_file)
@@ -143,7 +149,8 @@ class YahooFinanceAgent(BaseAgent):
         market_data: Optional[Dict[str, Any]],
         news_items: List[Dict[str, Any]],
         time_window: str,
-        sources: List[str]
+        sources: List[str],
+        finbert_stats: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Synthesize headlines, score financial sentiment, and generate report matching Reddit JSON schema."""
         try:
@@ -210,7 +217,9 @@ Output MUST strictly be valid JSON matching this schema:
                     "num_comments": p.get("num_comments", 0),
                     "upvote_ratio": p.get("upvote_ratio", 1.0),
                     "content_text": p.get("content_text") or p.get("summary") or p.get("title", ""),
-                    "time_ago": p.get("time_ago", "recently")
+                    "time_ago": p.get("time_ago", "recently"),
+                    "finbert_score": p.get("finbert_score"),
+                    "finbert_label": p.get("finbert_label"),
                 })
 
             posts_json = json.dumps(prepared_posts[:25], indent=2)
@@ -248,6 +257,20 @@ Output MUST strictly be valid JSON matching this schema:
                     for p in prepared_posts
                 ]
 
+            # Attach FinBERT metrics to each post
+            news_map = {p.get("id"): p for p in news_items}
+            for p in result.get("posts", []):
+                orig = news_map.get(p.get("id"))
+                if orig:
+                    p["finbert_label"] = orig.get("finbert_label")
+                    p["finbert_score"] = orig.get("finbert_score")
+                    p["finbert_confidence"] = orig.get("finbert_confidence")
+
+            if finbert_stats:
+                result["finbert_aggregate_score"] = finbert_stats.get("aggregate_score")
+                result["finbert_breakdown"] = finbert_stats.get("breakdown")
+                result["scoring_engine"] = "hybrid (FinBERT + LLM)"
+
             # Add operational metadata matching SignalReport exactly
             result["time_window"] = time_window
             result["subreddits_scanned"] = sources
@@ -263,7 +286,7 @@ Output MUST strictly be valid JSON matching this schema:
 
         except Exception as e:
             logger.error(f"LangChain LLM processing encountered error: {e}. Falling back to heuristic scoring.")
-            return self._process_heuristic(topic, symbol, asset_name, market_data, news_items, time_window, sources)
+            return self._process_heuristic(topic, symbol, asset_name, market_data, news_items, time_window, sources, finbert_stats)
 
     def _process_heuristic(
         self,
@@ -273,9 +296,10 @@ Output MUST strictly be valid JSON matching this schema:
         market_data: Optional[Dict[str, Any]],
         news_items: List[Dict[str, Any]],
         time_window: str,
-        sources: List[str]
+        sources: List[str],
+        finbert_stats: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
-        """Deterministic heuristic fallback scoring when no LLM key is configured."""
+        """Deterministic scoring fallback utilizing Hugging Face FinBERT or keyword rules."""
         bullish_keywords = {
             "surge", "jump", "rally", "gain", "rise", "soar", "beat", "record",
             "upgrade", "bull", "bullish", "growth", "boost", "outperform", "buy", "top pick"
@@ -293,26 +317,39 @@ Output MUST strictly be valid JSON matching this schema:
 
         for item in news_items:
             content = f"{item.get('title', '')} {item.get('content_text', '')}".lower()
-            bull_hits = sum(1 for w in bullish_keywords if w in content)
-            bear_hits = sum(1 for w in bearish_keywords if w in content)
-
             topic_terms = [topic.lower(), (symbol or "").lower(), asset_name.lower().split()[0]]
             is_relevant = any(term in content for term in topic_terms if len(term) >= 3)
             if not is_relevant:
                 is_relevant = True
 
-            if bull_hits > bear_hits:
-                label = "positive"
-                score = min(25.0 + (bull_hits * 15.0), 90.0)
-                pos += 1
-            elif bear_hits > bull_hits:
-                label = "negative"
-                score = max(-25.0 - (bear_hits * 15.0), -90.0)
-                neg += 1
+            # Prefer FinBERT predictions
+            if "finbert_score" in item and item["finbert_score"] is not None:
+                score = float(item["finbert_score"])
+                label = item.get("finbert_label", "neutral")
+                confidence = float(item.get("finbert_confidence", 0.85))
+                if label == "positive":
+                    pos += 1
+                elif label == "negative":
+                    neg += 1
+                else:
+                    neu += 1
             else:
-                label = "neutral"
-                score = 0.0
-                neu += 1
+                bull_hits = sum(1 for w in bullish_keywords if w in content)
+                bear_hits = sum(1 for w in bearish_keywords if w in content)
+
+                if bull_hits > bear_hits:
+                    label = "positive"
+                    score = min(25.0 + (bull_hits * 15.0), 90.0)
+                    pos += 1
+                elif bear_hits > bull_hits:
+                    label = "negative"
+                    score = max(-25.0 - (bear_hits * 15.0), -90.0)
+                    neg += 1
+                else:
+                    label = "neutral"
+                    score = 0.0
+                    neu += 1
+                confidence = 0.75
 
             total_score += score
             pub_name = item.get("subreddit") or item.get("publisher", "Yahoo Finance")
@@ -372,6 +409,9 @@ Output MUST strictly be valid JSON matching this schema:
             "total_posts_retrieved": len(news_items),
             "relevant_posts_count": len(processed_posts),
             "generated_at": datetime.now(timezone.utc).isoformat(),
+            "finbert_aggregate_score": finbert_stats.get("aggregate_score") if finbert_stats else avg_score,
+            "finbert_breakdown": finbert_stats.get("breakdown") if finbert_stats else {"positive": pos, "neutral": neu, "negative": neg},
+            "scoring_engine": "FinBERT (ProsusAI/finbert)" if (self.finbert and self.finbert.is_loaded) else "heuristic_rules",
             "market_context": market_data,
             "resolved_symbol": symbol
         }

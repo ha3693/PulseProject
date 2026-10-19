@@ -11,6 +11,18 @@ from agents.reddit import (
     RedditUserAgent,
     RedditUserNewsAgent,
 )
+from agents.stocktwits import (
+    StockTwitsMarketAgent,
+    PulseStockTwitsAgent,
+    StockTwitsUserAgent,
+    StockTwitsUserNewsAgent,
+)
+from agents.bluesky import (
+    BlueskyMarketAgent,
+    PulseBlueskyAgent,
+    BlueskyUserAgent,
+    BlueskyUserNewsAgent,
+)
 
 AVAILABLE_AGENTS = {
     "yahoo": YahooFinanceAgent,
@@ -21,6 +33,16 @@ AVAILABLE_AGENTS = {
     "reddit_market": RedditMarketAgent,
     "reddit-user": RedditUserAgent,
     "reddit_user": RedditUserAgent,
+    "stocktwits": StockTwitsMarketAgent,
+    "stocktwits-market": StockTwitsMarketAgent,
+    "stocktwits_market": StockTwitsMarketAgent,
+    "stocktwits-user": StockTwitsUserAgent,
+    "stocktwits_user": StockTwitsUserAgent,
+    "bluesky": BlueskyMarketAgent,
+    "bluesky-market": BlueskyMarketAgent,
+    "bluesky_market": BlueskyMarketAgent,
+    "bluesky-user": BlueskyUserAgent,
+    "bluesky_user": BlueskyUserAgent,
 }
 
 
@@ -45,6 +67,14 @@ __all__ = [
     "PulseRedditAgent",
     "RedditUserAgent",
     "RedditUserNewsAgent",
+    "StockTwitsMarketAgent",
+    "PulseStockTwitsAgent",
+    "StockTwitsUserAgent",
+    "StockTwitsUserNewsAgent",
+    "BlueskyMarketAgent",
+    "PulseBlueskyAgent",
+    "BlueskyUserAgent",
+    "BlueskyUserNewsAgent",
     "AVAILABLE_AGENTS",
     "get_agent",
 ]

@@ -13,7 +13,15 @@ root_dir = Path(__file__).resolve().parent
 if str(root_dir) not in sys.path:
     sys.path.insert(0, str(root_dir))
 
-from agents.cli import run_yahoo, run_reddit, run_reddit_user
+from agents.cli import (
+    run_yahoo,
+    run_reddit,
+    run_reddit_user,
+    run_stocktwits,
+    run_stocktwits_user,
+    run_bluesky,
+    run_bluesky_user,
+)
 
 
 def main():
@@ -26,8 +34,17 @@ def main():
         "-a",
         type=str,
         default=None,
-        choices=["yahoo", "reddit", "reddit-user"],
-        help="Agent to run:\n  'yahoo': Yahoo Finance EOD feeds & news\n  'reddit': Reddit financial subreddits (r/investing, r/stocks, r/wsb)\n  'reddit-user': Reddit user profile monitoring"
+        choices=["yahoo", "reddit", "reddit-user", "stocktwits", "stocktwits-user", "bluesky", "bluesky-user"],
+        help=(
+            "Agent to run:\n"
+            "  'yahoo': Yahoo Finance EOD feeds & news\n"
+            "  'reddit': Reddit financial subreddits (r/investing, r/stocks, r/wsb)\n"
+            "  'reddit-user': Reddit user profile monitoring\n"
+            "  'stocktwits': StockTwits real-time retail sentiment & options chatter\n"
+            "  'stocktwits-user': StockTwits trader/analyst stream monitoring\n"
+            "  'bluesky': Bluesky conversational microblogging & tech sentiment\n"
+            "  'bluesky-user': Bluesky account/organization feed tracking"
+        )
     )
     parser.add_argument(
         "--topic",
@@ -41,7 +58,7 @@ def main():
         "-u",
         type=str,
         default=None,
-        help="Target Reddit username to track (e.g. 'OpenAI', 'sama', 'spez')"
+        help="Target account handle (e.g. Reddit 'OpenAI', StockTwits 'howardlindzon', Bluesky 'bsky.app')"
     )
     parser.add_argument(
         "--window",
@@ -68,7 +85,7 @@ def main():
     parser.add_argument(
         "--all",
         action="store_true",
-        help="Bypass deduplication cache (reddit-user agent)"
+        help="Bypass deduplication cache (user monitoring agents)"
     )
     parser.add_argument(
         "--clear-seen",
@@ -98,9 +115,11 @@ def main():
         else:
             selected_agent = "yahoo"
 
+    is_user_agent = selected_agent in ["reddit-user", "stocktwits-user", "bluesky-user"]
+
     # Set default topic if not supplied
-    if not args.topic:
-        args.topic = "NVDA" if selected_agent != "reddit-user" else None
+    if not args.topic and not is_user_agent:
+        args.topic = "NVDA"
 
     if selected_agent == "yahoo":
         run_yahoo(args)
@@ -110,6 +129,21 @@ def main():
     elif selected_agent == "reddit-user":
         args.user = args.user or "OpenAI"
         run_reddit_user(args)
+    elif selected_agent == "stocktwits":
+        args.limit = max(args.limit, 15)
+        run_stocktwits(args)
+    elif selected_agent == "stocktwits-user":
+        args.user = args.user or "howardlindzon"
+        args.limit = max(args.limit, 10)
+        run_stocktwits_user(args)
+    elif selected_agent == "bluesky":
+        args.window = "week" if args.window == "day" else args.window
+        args.limit = max(args.limit, 10)
+        run_bluesky(args)
+    elif selected_agent == "bluesky-user":
+        args.user = args.user or "bsky.app"
+        args.limit = max(args.limit, 10)
+        run_bluesky_user(args)
 
 
 if __name__ == "__main__":
