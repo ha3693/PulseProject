@@ -71,30 +71,40 @@ PulseProject/
 ├── main.py                   # Master agent dispatcher CLI
 ├── agents/                   # Unified Intelligence Agents Package
 │   ├── __init__.py           # Agent registry and factory (get_agent)
-│   ├── base.py               # BaseAgent class (common LLM setup, persistence)
+│   ├── base.py               # BaseAgent class (common LLM setup, persistence, FinBERT hooks)
+│   ├── finbert.py            # Hugging Face FinBERT Scorer (ProsusAI/finbert on mps/cpu)
 │   ├── schemas.py            # Unified Pydantic schemas (SignalReport, PostItem)
 │   ├── cli.py                # Unified CLI runner (python -m agents.cli ...)
 │   ├── yahoo_finance/        # Yahoo Finance EOD Feeds & News Agent
 │   │   ├── __init__.py
 │   │   ├── agent.py          # YahooFinanceAgent implementation
 │   │   └── extractor.py      # EOD feed, quotes & snippet extractor
-│   └── reddit/               # Reddit Sentiment & Signal Agents
+│   ├── reddit/               # Reddit Sentiment & Signal Agents
+│   │   ├── __init__.py
+│   │   ├── market_agent.py   # RedditMarketAgent (r/investing, r/stocks, r/wsb)
+│   │   ├── user_agent.py     # RedditUserAgent (user tracking, e.g. u/OpenAI)
+│   │   ├── client.py         # Reddit client with OAuth & public API fallbacks
+│   │   ├── user_extractor.py # Reddit user submissions extractor
+│   │   └── deduplicator.py   # PostDeduplicator for seen_posts.json
+│   ├── stocktwits/           # StockTwits Retail Sentiment & Stream Agents
+│   │   ├── __init__.py
+│   │   ├── market_agent.py   # StockTwitsMarketAgent (symbol streams & sentiment tags)
+│   │   ├── user_agent.py     # StockTwitsUserAgent (trader/analyst tracking)
+│   │   ├── client.py         # StockTwits client with REST endpoints & mock fallback
+│   │   └── user_extractor.py # StockTwits user message extractor
+│   └── bluesky/              # Bluesky Social & Tech Discussion Agents
 │       ├── __init__.py
-│       ├── market_agent.py   # RedditMarketAgent (r/investing, r/stocks, r/wsb)
-│       ├── user_agent.py     # RedditUserAgent (user tracking, e.g. u/OpenAI)
-│       ├── client.py         # Reddit client with OAuth & public API fallbacks
-│       ├── user_extractor.py # Reddit user submissions extractor
-│       └── deduplicator.py   # PostDeduplicator for seen_posts.json
+│       ├── market_agent.py   # BlueskyMarketAgent (topic search & discourse analysis)
+│       ├── user_agent.py     # BlueskyUserAgent (actor feed & milestone tracking)
+│       ├── client.py         # Bluesky client with XRPC API & mock fallback
+│       └── user_extractor.py # Bluesky author feed extractor
 ├── docs/                     # Architectural and data source specifications
 │   ├── ARCHITECTURE.md       # High-level architecture and algorithm design
 │   └── DATA_SOURCES.md       # API limits, data privacy, and source compliance
 ├── frontend/                 # Next.js web application
 │   └── .gitkeep
-├── data-pipeline/            # Data pipeline tools and runners
-│   ├── requirements.txt      # Python dependencies (yfinance, pandas, transformers, etc.)
-│   ├── reddit_agent.py       # Pipeline runner for Reddit Market agent
-│   └── yahoo_finance_agent.py# Pipeline runner for Yahoo Finance agent
 ├── output/                   # Generated JSON market signals & reports
+├── requirements.txt          # Python dependencies (LangChain, yfinance, PRAW, transformers, torch)
 └── supabase/                 # Supabase configuration & database migrations
     ├── schema.sql            # Database schema (topics, raw_content, signals)
     └── migrations/
@@ -115,12 +125,23 @@ cp .env.example .env
 ```
 Fill in the required Supabase URL, API keys for LLMs, Finnhub, and Reddit.
 
-### 2. Python Pipeline Setup
+### 2. Python Environment & Agents Setup
 ```bash
-cd data-pipeline
 python3 -m venv .venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 pip install -r requirements.txt
+
+# Run any Pulse agent via master dispatcher
+python main.py --agent yahoo --topic NVDA --mock
+python main.py --agent reddit --topic NVDA --mock
+python main.py --agent reddit-user --user OpenAI --mock
+python main.py --agent stocktwits --topic NVDA
+python main.py --agent stocktwits-user --user howardlindzon
+python main.py --agent bluesky --topic NVDA
+python main.py --agent bluesky-user --user bsky.app
+
+# Direct FinBERT inference benchmark
+python -m agents.finbert "NVIDIA beats earnings expectations with massive datacenter backlog growth"
 ```
 
 ### 3. Frontend Setup

@@ -71,6 +71,18 @@ class PostItem(BaseModel):
         description="Theme tags (e.g. ['earnings', 'guidance', 'ai_hardware', 'options_flow'])"
     )
     relevance_reason: Optional[str] = Field(default=None, description="Brief rationale for inclusion or filtering")
+    finbert_label: Optional[Literal["positive", "neutral", "negative"]] = Field(
+        default=None,
+        description="FinBERT classification: positive, neutral, or negative"
+    )
+    finbert_score: Optional[float] = Field(
+        default=None,
+        description="FinBERT net score between -100.0 (bearish) and +100.0 (bullish)"
+    )
+    finbert_confidence: Optional[float] = Field(
+        default=None,
+        description="FinBERT model confidence (0.0 to 1.0)"
+    )
 
 
 class SignalReport(BaseModel):
@@ -101,6 +113,20 @@ class SignalReport(BaseModel):
     total_posts_retrieved: int = Field(default=0, description="Total raw posts ingested")
     relevant_posts_count: int = Field(default=0, description="Number of posts confirmed relevant to topic")
     generated_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+    # FinBERT Domain Scoring Benchmark & Calibration
+    finbert_aggregate_score: Optional[float] = Field(
+        default=None,
+        description="Aggregate sentiment score derived directly from HuggingFace FinBERT model"
+    )
+    finbert_breakdown: Optional[Dict[str, int]] = Field(
+        default=None,
+        description="Sentiment distribution determined by FinBERT model"
+    )
+    scoring_engine: Optional[str] = Field(
+        default="hybrid (FinBERT + LLM)",
+        description="NLP model pipeline used for scoring (e.g. 'FinBERT', 'LLM', or 'hybrid')"
+    )
 
     # Optional complementary market pricing data
     market_context: Optional[EODMarketContext] = Field(default=None, description="EOD closing market metrics")
