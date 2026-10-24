@@ -23,6 +23,11 @@ from agents.bluesky import (
     BlueskyUserAgent,
     BlueskyUserNewsAgent,
 )
+from agents.gdelt import (
+    GdeltAgent,
+    GdeltDocAgent,
+    PulseGdeltAgent,
+)
 
 AVAILABLE_AGENTS = {
     "yahoo": YahooFinanceAgent,
@@ -43,6 +48,11 @@ AVAILABLE_AGENTS = {
     "bluesky_market": BlueskyMarketAgent,
     "bluesky-user": BlueskyUserAgent,
     "bluesky_user": BlueskyUserAgent,
+    "gdelt": GdeltAgent,
+    "gdelt-doc": GdeltAgent,
+    "gdelt_doc": GdeltAgent,
+    "gdelt-news": GdeltAgent,
+    "gdelt_news": GdeltAgent,
 }
 
 
@@ -75,6 +85,9 @@ __all__ = [
     "PulseBlueskyAgent",
     "BlueskyUserAgent",
     "BlueskyUserNewsAgent",
+    "GdeltAgent",
+    "GdeltDocAgent",
+    "PulseGdeltAgent",
     "AVAILABLE_AGENTS",
     "get_agent",
 ]
