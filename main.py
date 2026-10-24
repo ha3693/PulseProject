@@ -4,6 +4,7 @@ Pulse Platform - Master Agent Dispatcher.
 Executes any Pulse agent across Yahoo Finance EOD feeds, Reddit Market subreddits, or Reddit User tracking.
 """
 
+import os
 import sys
 import argparse
 from pathlib import Path
@@ -13,6 +14,14 @@ root_dir = Path(__file__).resolve().parent
 if str(root_dir) not in sys.path:
     sys.path.insert(0, str(root_dir))
 
+# Auto-re-exec in virtual environment if invoked with unconfigured system Python
+venv_python = root_dir / ".venv" / "bin" / "python"
+if venv_python.exists() and sys.executable != str(venv_python):
+    try:
+        import langchain_core
+    except ImportError:
+        os.execv(str(venv_python), [str(venv_python)] + sys.argv)
+
 from agents.cli import (
     run_yahoo,
     run_reddit,
@@ -21,6 +30,7 @@ from agents.cli import (
     run_stocktwits_user,
     run_bluesky,
     run_bluesky_user,
+    run_gdelt,
 )
 
 
@@ -34,7 +44,7 @@ def main():
         "-a",
         type=str,
         default=None,
-        choices=["yahoo", "reddit", "reddit-user", "stocktwits", "stocktwits-user", "bluesky", "bluesky-user"],
+        choices=["yahoo", "reddit", "reddit-user", "stocktwits", "stocktwits-user", "bluesky", "bluesky-user", "gdelt"],
         help=(
             "Agent to run:\n"
             "  'yahoo': Yahoo Finance EOD feeds & news\n"
@@ -43,7 +53,8 @@ def main():
             "  'stocktwits': StockTwits real-time retail sentiment & options chatter\n"
             "  'stocktwits-user': StockTwits trader/analyst stream monitoring\n"
             "  'bluesky': Bluesky conversational microblogging & tech sentiment\n"
-            "  'bluesky-user': Bluesky account/organization feed tracking"
+            "  'bluesky-user': Bluesky account/organization feed tracking\n"
+            "  'gdelt': GDELT DOC 2.0 global news & market intelligence"
         )
     )
     parser.add_argument(
@@ -144,6 +155,9 @@ def main():
         args.user = args.user or "bsky.app"
         args.limit = max(args.limit, 10)
         run_bluesky_user(args)
+    elif selected_agent == "gdelt":
+        args.limit = max(args.limit, 5)
+        run_gdelt(args)
 
 
 if __name__ == "__main__":

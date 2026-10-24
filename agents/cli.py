@@ -4,6 +4,7 @@ Pulse Unified Agent CLI Runner.
 Command-line interface to execute any Pulse agent across Yahoo Finance, Reddit Market, and Reddit User.
 """
 
+import os
 import sys
 import argparse
 from pathlib import Path
@@ -13,6 +14,14 @@ root_dir = Path(__file__).resolve().parent.parent
 if str(root_dir) not in sys.path:
     sys.path.insert(0, str(root_dir))
 
+# Auto-re-exec in virtual environment if invoked with unconfigured system Python
+venv_python = root_dir / ".venv" / "bin" / "python"
+if venv_python.exists() and sys.executable != str(venv_python):
+    try:
+        import langchain_core
+    except ImportError:
+        os.execv(str(venv_python), [str(venv_python)] + sys.argv)
+
 from agents import (
     YahooFinanceAgent,
     RedditMarketAgent,
@@ -21,6 +30,7 @@ from agents import (
     StockTwitsUserAgent,
     BlueskyMarketAgent,
     BlueskyUserAgent,
+    GdeltAgent,
 )
 
 
@@ -96,6 +106,18 @@ def run_bluesky(args):
         use_mock=args.mock,
     )
     _print_signal_report("Bluesky Social Signal", result)
+
+
+def run_gdelt(args):
+    agent = GdeltAgent()
+    result = agent.run(
+        topic=args.topic,
+        time_window=args.window,
+        limit=args.limit,
+        output_file=args.output,
+        use_mock=args.mock,
+    )
+    _print_signal_report("GDELT DOC 2.0 Global News", result)
 
 
 def run_bluesky_user(args):
@@ -264,6 +286,15 @@ def main():
     bsky_user_parser.add_argument("--output", "-o", type=str, default=None, help="Custom output JSON filepath")
     bsky_user_parser.add_argument("--mock", action="store_true", help="Run with representative mock data")
     bsky_user_parser.set_defaults(func=run_bluesky_user)
+
+    # GDELT DOC 2.0 Agent subparser
+    gdelt_parser = subparsers.add_parser("gdelt", help="GDELT DOC 2.0 Global News & Market Intelligence Agent")
+    gdelt_parser.add_argument("--topic", "-t", type=str, default="NVDA", help="Asset ticker, company, or news topic (e.g. 'NVDA', 'Apple', 'Semiconductors')")
+    gdelt_parser.add_argument("--window", "-w", type=str, default="day", choices=["24h", "day", "week", "month"])
+    gdelt_parser.add_argument("--limit", "-l", type=int, default=3, help="Maximum news articles to retrieve (default: 3)")
+    gdelt_parser.add_argument("--output", "-o", type=str, default=None, help="Custom output JSON filepath")
+    gdelt_parser.add_argument("--mock", action="store_true", help="Run with representative mock data")
+    gdelt_parser.set_defaults(func=run_gdelt)
 
     args = parser.parse_args()
     args.func(args)
