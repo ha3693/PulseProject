@@ -108,8 +108,31 @@ def main():
         action="store_true",
         help="Run using representative synthetic data (offline / test mode)"
     )
+    parser.add_argument(
+        "--ingest",
+        action="store_true",
+        help="Run the multi-agent scheduled ingestion pipeline across all 14 topics and sync to Supabase"
+    )
+    parser.add_argument(
+        "--schedule",
+        action="store_true",
+        help="Start the continuous scheduled ingestion daemon (runs every 6 hours)"
+    )
 
     args = parser.parse_args()
+
+    if args.ingest or args.schedule:
+        from agents.scheduler import PulseIngestionOrchestrator
+        orchestrator = PulseIngestionOrchestrator(use_mock=True)
+        if args.schedule:
+            import time
+            print("🕒 Starting Pulse Scheduled Ingestion Daemon (every 6 hours)...")
+            while True:
+                orchestrator.run_pipeline(topic_filter=args.topic, trigger_source="scheduled_daemon", sync_db=True)
+                time.sleep(21600)
+        else:
+            orchestrator.run_pipeline(topic_filter=args.topic, trigger_source="manual_cli", sync_db=True)
+        return
 
     # Clear seen posts if requested
     if args.clear_seen:
