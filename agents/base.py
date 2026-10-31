@@ -3,7 +3,9 @@
 import os
 import sys
 import json
+import uuid
 import logging
+import urllib.request
 from abc import ABC, abstractmethod
 from pathlib import Path
 from datetime import datetime, timezone
@@ -96,6 +98,64 @@ def get_llm():
     return None
 
 
+def emit_langsmith_trace(
+    name: str,
+    inputs: Dict[str, Any],
+    outputs: Dict[str, Any],
+    run_type: str = "chain",
+    tags: Optional[List[str]] = None,
+    start_time: Optional[str] = None,
+    end_time: Optional[str] = None,
+) -> bool:
+    """
+    Send an execution trace to LangSmith (https://api.smith.langchain.com/runs)
+    when LANGCHAIN_TRACING_V2=true and LANGCHAIN_API_KEY is configured in .env.
+    Works in both LLM mode and deterministic FinBERT/heuristic mode.
+    """
+    tracing_enabled = os.getenv("LANGCHAIN_TRACING_V2", "").lower() in ("true", "1", "yes")
+    api_key = os.getenv("LANGCHAIN_API_KEY", "").strip()
+    if not tracing_enabled or not api_key:
+        return False
+
+    project_name = os.getenv("LANGCHAIN_PROJECT", "PulsePlatform").strip() or "PulsePlatform"
+    endpoint = os.getenv("LANGCHAIN_ENDPOINT", "https://api.smith.langchain.com").rstrip("/")
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    payload = {
+        "id": str(uuid.uuid4()),
+        "name": name,
+        "run_type": run_type,
+        "start_time": start_time or now_iso,
+        "end_time": end_time or now_iso,
+        "inputs": inputs,
+        "outputs": outputs,
+        "session_name": project_name,
+        "tags": tags or ["pulse-agent"],
+        "extra": {
+            "metadata": {
+                "platform": "Pulse Sentiment & Market Signal Platform",
+                "project": project_name,
+            }
+        },
+    }
+
+    try:
+        req = urllib.request.Request(
+            f"{endpoint}/runs",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "x-api-key": api_key,
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            return resp.status in (200, 201, 202)
+    except Exception as e:
+        logger.debug(f"LangSmith trace notice for {name}: {e}")
+        return False
+
+
 class BaseAgent(ABC):
     """Abstract base class for all Pulse data agents."""
 
@@ -152,5 +212,21 @@ class BaseAgent(ABC):
 
         with open(path, "w", encoding="utf-8") as f:
             json.dump(report_data, f, indent=2, ensure_ascii=False)
+
+        # Automatically emit a structured LangSmith trace run for this agent execution
+        emit_langsmith_trace(
+            name=self.__class__.__name__,
+            inputs={"target": topic_or_user, "prefix": prefix},
+            outputs={
+                "aggregate_sentiment_score": report_data.get("aggregate_sentiment_score"),
+                "overall_sentiment": report_data.get("overall_sentiment") or report_data.get("sentiment_signal"),
+                "total_posts_analyzed": report_data.get("total_posts_analyzed") or report_data.get("new_posts_analyzed", 0),
+                "top_themes": report_data.get("top_themes") or report_data.get("key_themes", []),
+                "executive_summary": report_data.get("executive_summary", ""),
+                "report_path": str(path),
+            },
+            run_type="chain",
+            tags=["pulse-agent", prefix, self.__class__.__name__],
+        )
 
         return path
