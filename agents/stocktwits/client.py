@@ -56,31 +56,31 @@ class StockTwitsClient:
             logger.info(f"Using synthetic/mock data generator for StockTwits symbol '${clean_symbol}'")
             return self._generate_mock_messages(clean_symbol, limit)
 
-        if not requests:
-            logger.warning("Requests library not available. Using mock data.")
-            return self._generate_mock_messages(clean_symbol, limit)
+        import urllib.request
+        import urllib.parse
 
-        url = f"{STOCKTWITS_API_BASE}/streams/symbol/{clean_symbol}.json"
-        params = {"limit": min(limit, 30)}
+        url = f"{STOCKTWITS_API_BASE}/streams/symbol/{urllib.parse.quote(clean_symbol)}.json?limit={min(limit, 30)}"
 
         try:
-            resp = requests.get(url, headers=self.headers, params=params, timeout=10)
-            if resp.status_code == 200:
-                data = resp.json()
+            if requests is not None:
+                resp = requests.get(url, headers=self.headers, timeout=8)
+                status_code = resp.status_code
+                data = resp.json() if status_code == 200 else {}
+            else:
+                req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0", "Accept": "application/json"})
+                with urllib.request.urlopen(req, timeout=8) as r:
+                    status_code = r.status
+                    data = json.loads(r.read().decode("utf-8"))
+
+            if status_code == 200:
                 raw_messages = data.get("messages", [])
                 logger.info(f"Retrieved {len(raw_messages)} live messages from StockTwits for ${clean_symbol}")
-                return [self._normalize_message(m, clean_symbol) for m in raw_messages]
-            elif resp.status_code == 404:
-                logger.warning(f"StockTwits symbol '${clean_symbol}' not found (404). Falling back to mock generator.")
-                return self._generate_mock_messages(clean_symbol, limit)
-            elif resp.status_code == 429:
-                logger.warning("StockTwits API rate limit reached (429). Providing representative mock data.")
-                return self._generate_mock_messages(clean_symbol, limit)
+                return [self._normalize_message(m, clean_symbol) for m in raw_messages[:limit]]
             else:
-                logger.warning(f"StockTwits API returned HTTP {resp.status_code}: {resp.text[:120]}. Falling back to mock.")
+                logger.warning(f"StockTwits API returned HTTP {status_code} for '${clean_symbol}'. Falling back to mock.")
                 return self._generate_mock_messages(clean_symbol, limit)
         except Exception as err:
-            logger.error(f"Error querying StockTwits for '${clean_symbol}': {err}. Using mock fallback.")
+            logger.warning(f"StockTwits live stream fallback for '${clean_symbol}': {err}")
             return self._generate_mock_messages(clean_symbol, limit)
 
     def fetch_user_stream(
@@ -98,27 +98,31 @@ class StockTwitsClient:
             logger.info(f"Using mock data generator for StockTwits user @{clean_user}")
             return self._generate_mock_user_messages(clean_user, limit)
 
-        if not requests:
-            return self._generate_mock_user_messages(clean_user, limit)
+        import urllib.request
+        import urllib.parse
 
-        url = f"{STOCKTWITS_API_BASE}/streams/user/{clean_user}.json"
-        params = {"limit": min(limit, 30)}
+        url = f"{STOCKTWITS_API_BASE}/streams/user/{urllib.parse.quote(clean_user)}.json?limit={min(limit, 30)}"
 
         try:
-            resp = requests.get(url, headers=self.headers, params=params, timeout=10)
-            if resp.status_code == 200:
-                data = resp.json()
-                raw_messages = data.get("messages", [])
-                logger.info(f"Retrieved {len(raw_messages)} messages from @{clean_user} on StockTwits")
-                return [self._normalize_message(m, f"user:{clean_user}") for m in raw_messages]
-            elif resp.status_code == 429:
-                logger.warning(f"StockTwits user stream rate limited (429). Falling back to mock.")
-                return self._generate_mock_user_messages(clean_user, limit)
+            if requests is not None:
+                resp = requests.get(url, headers=self.headers, timeout=8)
+                status_code = resp.status_code
+                data = resp.json() if status_code == 200 else {}
             else:
-                logger.warning(f"StockTwits user stream HTTP {resp.status_code}. Using mock fallback.")
+                req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0", "Accept": "application/json"})
+                with urllib.request.urlopen(req, timeout=8) as r:
+                    status_code = r.status
+                    data = json.loads(r.read().decode("utf-8"))
+
+            if status_code == 200:
+                raw_messages = data.get("messages", [])
+                logger.info(f"Retrieved {len(raw_messages)} live messages from @{clean_user} on StockTwits")
+                return [self._normalize_message(m, f"user:{clean_user}") for m in raw_messages[:limit]]
+            else:
+                logger.warning(f"StockTwits user stream HTTP {status_code}. Using fallback.")
                 return self._generate_mock_user_messages(clean_user, limit)
         except Exception as err:
-            logger.error(f"Error fetching StockTwits user @{clean_user}: {err}")
+            logger.warning(f"StockTwits user stream fallback for @{clean_user}: {err}")
             return self._generate_mock_user_messages(clean_user, limit)
 
     def fetch_trending_symbols(self, limit: int = 10) -> List[Dict[str, Any]]:

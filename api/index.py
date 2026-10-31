@@ -63,7 +63,7 @@ class handler(BaseHTTPRequestHandler):
         trigger = body.get("trigger", "vercel_service_binding")
 
         try:
-            orchestrator = PulseIngestionOrchestrator(use_mock=True)
+            orchestrator = PulseIngestionOrchestrator(use_mock=False)
             snapshot = orchestrator.run_pipeline(
                 topic_filter=topic,
                 trigger_source=trigger,

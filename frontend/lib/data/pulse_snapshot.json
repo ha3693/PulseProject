@@ -1,7 +1,7 @@
 {
-  "generated_at": "2026-10-31T05:15:56.213871+00:00",
-  "trigger_source": "web_dashboard",
-  "duration_ms": 1049,
+  "generated_at": "2026-10-31T11:12:08.179326+00:00",
+  "trigger_source": "manual_cli",
+  "duration_ms": 8241,
   "db_synced": true,
   "schedule_cron": "0 */6 * * * (Every 6 Hours via Supabase pg_cron & Python Daemon)",
   "agents_active": [
@@ -31,39 +31,39 @@
         "volatility": 0.028,
         "sentiment_bias": 34.0
       },
-      "pulse_index": 33.9,
-      "finbert_index": 33.7,
+      "pulse_index": 23.5,
+      "finbert_index": 23.9,
       "latest_price": 204.64,
       "price_change": -9.02,
       "price_change_pct": -4.22,
-      "positive_count": 13,
-      "neutral_count": 5,
-      "negative_count": 5,
-      "total_volume": 23,
+      "positive_count": 7,
+      "neutral_count": 12,
+      "negative_count": 2,
+      "total_volume": 21,
       "divergence_flag": true,
       "divergence_type": "bullish_divergence",
-      "synthesis": "Multi-agent consensus for NVIDIA Corporation (NVDA) registers a Pulse Index of +33.9 (FinBERT benchmark: +33.7) across 23 verified items from Yahoo Finance, GDELT DOC 2.0, Reddit, StockTwits, and Bluesky. Asset closed at $204.64 (-4.22%).",
+      "synthesis": "Multi-agent consensus for NVIDIA Corporation (NVDA) registers a Pulse Index of +23.5 (FinBERT benchmark: +23.9) across 21 verified items from Yahoo Finance, GDELT DOC 2.0, Reddit, StockTwits, and Bluesky. Asset closed at $204.64 (-4.22%).",
       "top_drivers": {
         "agent_scores": {
-          "yahoo": 32.2,
-          "reddit": 37.0,
-          "stocktwits": 34.0,
+          "yahoo": 33.4,
+          "reddit": 41.0,
+          "stocktwits": 29.2,
           "bluesky": 22.1,
-          "gdelt": 41.4
+          "gdelt": -3.6
         },
-        "finbert_index": 33.7,
+        "finbert_index": 23.9,
         "model_agreement_pct": 86.4,
         "positive_catalysts": [
-          "Constructive coverage in Bloomberg Technology: Nvidia Blackwell Ultra GPU Architecture Production Ramps Ahead of Schedule",
-          "Constructive coverage in Investing.com: Morgan Stanley Reaffirms Top Pick on Nvidia: AI Data Center Capex Remains Robust",
+          "Constructive coverage in Motley Fool: Wall Street Thinks Archer Aviation Stock Is a Buy. Here's Why I Don't",
+          "Constructive coverage in Motley Fool: 5 Dividend Stocks to Buy and Hold for the Next 5 Years",
           "Bullish mentions across r/investing",
           "Bullish mentions across r/stocks"
         ],
         "risk_factors": [
-          "Headwinds reported in Reuters Financial: Regulatory Scrutiny: DOJ Explores Antitrust Inquiries into AI Bundling Practices",
-          "Bearish concerns noted in r/wallstreetbets",
+          "Bearish concerns noted in r/stocks",
           "RSI overbought warnings on short timeframes",
-          "Broader market multiple contraction risk"
+          "Broader market multiple contraction risk",
+          "Competitive alternatives emerging across peers"
         ],
         "top_themes": [
           "market_sentiment",
@@ -77,57 +77,76 @@
       },
       "posts": [
         {
-          "external_id": "nvda_yahoo_mock-nvda-1",
+          "external_id": "nvda_yahoo_d2ca6611-b72d-3916-9fc7-6dde2d504845",
           "source": "yahoo",
-          "outlet": "Bloomberg Technology",
-          "title": "Nvidia Blackwell Ultra GPU Architecture Production Ramps Ahead of Schedule",
-          "content_text": "Supply chain partners confirm Taiwan Semiconductor has cleared packaging bottlenecks for Nvidia's high-margin enterprise AI accelerators, paving the way for record hyperscaler deliveries.",
-          "url": "https://finance.yahoo.com/news/nvidia-blackwell-gpu-production-ramps-ahead-schedule.html",
-          "published_at": "2026-10-31T05:15:07.629404+00:00",
+          "outlet": "Motley Fool",
+          "title": "Social Security's Trump Bump-Led 2027 COLA Is Doing Something That Hasn't Been Witnessed This Century",
+          "content_text": "Social Security's Trump Bump-Led 2027 COLA Is Doing Something That Hasn't Been Witnessed This Century",
+          "url": "https://finance.yahoo.com/economy/policy/articles/social-securitys-trump-bump-led-105601853.html",
+          "published_at": "2026-10-31T10:56:01+00:00",
           "engagement_count": 0,
-          "sentiment_label": "positive",
-          "sentiment_score": 55.0,
+          "sentiment_label": "neutral",
+          "sentiment_score": 0.0,
           "confidence": 0.75,
-          "finbert_label": "positive",
-          "finbert_score": 53.1,
+          "finbert_label": "neutral",
+          "finbert_score": 2.5,
           "theme_tags": [
             "market_news",
             "eod_feed"
           ]
         },
         {
-          "external_id": "nvda_yahoo_mock-nvda-2",
+          "external_id": "nvda_yahoo_db30eb79-0e14-35cd-afb3-41942845538d",
           "source": "yahoo",
-          "outlet": "Investing.com",
-          "title": "Morgan Stanley Reaffirms Top Pick on Nvidia: AI Data Center Capex Remains Robust",
-          "content_text": "Analyst checks indicate big tech capital expenditures are pacing 20% higher than prior fiscal year estimates, with Nvidia capturing over 80% share of accelerated compute budgets.",
-          "url": "https://finance.yahoo.com/news/morgan-stanley-reaffirms-top-pick-nvidia-capex.html",
-          "published_at": "2026-10-31T05:15:07.629404+00:00",
+          "outlet": "Motley Fool",
+          "title": "Wall Street Thinks Archer Aviation Stock Is a Buy. Here's Why I Don't",
+          "content_text": "Wall Street Thinks Archer Aviation Stock Is a Buy. Here's Why I Don't",
+          "url": "https://finance.yahoo.com/markets/stocks/articles/wall-street-thinks-archer-aviation-104400125.html",
+          "published_at": "2026-10-31T10:44:00+00:00",
           "engagement_count": 0,
           "sentiment_label": "positive",
-          "sentiment_score": 40.0,
+          "sentiment_score": 41.0,
           "confidence": 0.75,
           "finbert_label": "positive",
-          "finbert_score": 39.3,
+          "finbert_score": 40.2,
           "theme_tags": [
             "market_news",
             "eod_feed"
           ]
         },
         {
-          "external_id": "nvda_yahoo_mock-nvda-3",
+          "external_id": "nvda_yahoo_5c28f463-7186-3e85-8b0e-449d352b8c08",
           "source": "yahoo",
-          "outlet": "Reuters Financial",
-          "title": "Regulatory Scrutiny: DOJ Explores Antitrust Inquiries into AI Bundling Practices",
-          "content_text": "Federal regulators sent informal requests regarding CUDA software licensing terms and high-bandwidth memory allocation agreements with premier cloud providers.",
-          "url": "https://finance.yahoo.com/news/regulatory-scrutiny-doj-explores-antitrust-inquiries-ai.html",
-          "published_at": "2026-10-31T05:15:07.629404+00:00",
+          "outlet": "Motley Fool",
+          "title": "If You Invest $5,000 in SOXX Today and Never Touch It, History Says It Could Be Worth This Much in 20 Years",
+          "content_text": "If You Invest $5,000 in SOXX Today and Never Touch It, History Says It Could Be Worth This Much in 20 Years",
+          "url": "https://finance.yahoo.com/markets/stocks/articles/invest-5-000-soxx-today-103500864.html",
+          "published_at": "2026-10-31T10:35:00+00:00",
           "engagement_count": 0,
-          "sentiment_label": "negative",
-          "sentiment_score": -40.0,
+          "sentiment_label": "neutral",
+          "sentiment_score": 0.0,
           "confidence": 0.75,
-          "finbert_label": "negative",
-          "finbert_score": -39.3,
+          "finbert_label": "neutral",
+          "finbert_score": 2.5,
+          "theme_tags": [
+            "market_news",
+            "eod_feed"
+          ]
+        },
+        {
+          "external_id": "nvda_yahoo_1a8083b9-2919-39ac-96f0-508fa5b45f45",
+          "source": "yahoo",
+          "outlet": "Motley Fool",
+          "title": "5 Dividend Stocks to Buy and Hold for the Next 5 Years",
+          "content_text": "5 Dividend Stocks to Buy and Hold for the Next 5 Years",
+          "url": "https://finance.yahoo.com/markets/stocks/articles/5-dividend-stocks-buy-hold-102000597.html",
+          "published_at": "2026-10-31T10:20:00+00:00",
+          "engagement_count": 0,
+          "sentiment_label": "positive",
+          "sentiment_score": 41.0,
+          "confidence": 0.75,
+          "finbert_label": "positive",
+          "finbert_score": 40.2,
           "theme_tags": [
             "market_news",
             "eod_feed"
@@ -140,13 +159,13 @@
           "title": "Long-term thesis on NVDA: Valuation vs growth rate",
           "content_text": "Considering a 5-10 year horizon for NVDA. Even with cyclical drawdowns, their pricing power and secular tailwinds make this a core holding in my portfolio.",
           "url": "https://reddit.com/r/investing/comments/demo_inv_101",
-          "published_at": "2026-10-31T05:15:07.761207+00:00",
+          "published_at": "2026-10-31T11:12:00.159054+00:00",
           "engagement_count": 1085,
           "sentiment_label": "positive",
-          "sentiment_score": 40.0,
-          "confidence": 0.75,
+          "sentiment_score": 78.5,
+          "confidence": 0.8588,
           "finbert_label": "positive",
-          "finbert_score": 39.3,
+          "finbert_score": 78.5,
           "theme_tags": [
             "retail_discussion",
             "market_action"
@@ -159,13 +178,13 @@
           "title": "Deep dive on NVDA competitive moat and margin durability",
           "content_text": "Analyzing the latest financial filing for NVDA. Revenue growth accelerated, free cash flow conversion reached 45%, and customer switching costs remain high.",
           "url": "https://reddit.com/r/stocks/comments/demo_sto_102",
-          "published_at": "2026-10-31T05:15:07.761207+00:00",
+          "published_at": "2026-10-31T11:12:00.159054+00:00",
           "engagement_count": 708,
-          "sentiment_label": "positive",
-          "sentiment_score": 40.0,
-          "confidence": 0.75,
-          "finbert_label": "positive",
-          "finbert_score": 39.3,
+          "sentiment_label": "negative",
+          "sentiment_score": -18.2,
+          "confidence": 0.5031,
+          "finbert_label": "negative",
+          "finbert_score": -18.2,
           "theme_tags": [
             "retail_discussion",
             "market_action"
@@ -178,13 +197,13 @@
           "title": "NVDA institutional ownership trends over the last quarter",
           "content_text": "Institutions increased their holdings in NVDA by 3.2% net. Retail sentiment remains bullish while macro headwinds persist.",
           "url": "https://reddit.com/r/stocks/comments/demo_sto_103",
-          "published_at": "2026-10-31T05:15:07.761207+00:00",
+          "published_at": "2026-10-31T11:12:00.159054+00:00",
           "engagement_count": 252,
           "sentiment_label": "positive",
-          "sentiment_score": 55.0,
-          "confidence": 0.75,
+          "sentiment_score": 12.7,
+          "confidence": 0.4897,
           "finbert_label": "positive",
-          "finbert_score": 53.1,
+          "finbert_score": 12.7,
           "theme_tags": [
             "retail_discussion",
             "market_action"
@@ -197,13 +216,13 @@
           "title": "YOLO on NVDA calls ahead of earnings — here is my DD",
           "content_text": "Brothers, NVDA is breaking out. Forward guidance looks solid, data center demand is relentless, and options flow shows heavy call accumulation at next month's strikes.",
           "url": "https://reddit.com/r/wallstreetbets/comments/demo_wal_104",
-          "published_at": "2026-10-31T05:15:07.761207+00:00",
+          "published_at": "2026-10-31T11:12:00.159054+00:00",
           "engagement_count": 1732,
           "sentiment_label": "positive",
-          "sentiment_score": 55.0,
-          "confidence": 0.75,
+          "sentiment_score": 89.0,
+          "confidence": 0.9279,
           "finbert_label": "positive",
-          "finbert_score": 53.1,
+          "finbert_score": 89.0,
           "theme_tags": [
             "retail_discussion",
             "market_action"
@@ -216,287 +235,230 @@
           "title": "Is anyone else hedging their NVDA exposure with puts?",
           "content_text": "Valuations are stretched and multiple expansion cannot go on forever. Buying cheap out of the money protection just in case.",
           "url": "https://reddit.com/r/wallstreetbets/comments/demo_wal_105",
-          "published_at": "2026-10-31T05:15:07.761207+00:00",
+          "published_at": "2026-10-31T11:12:00.159054+00:00",
           "engagement_count": 525,
-          "sentiment_label": "negative",
-          "sentiment_score": -55.0,
-          "confidence": 0.75,
-          "finbert_label": "negative",
-          "finbert_score": -53.1,
+          "sentiment_label": "positive",
+          "sentiment_score": 9.7,
+          "confidence": 0.4395,
+          "finbert_label": "positive",
+          "finbert_score": 9.7,
           "theme_tags": [
             "retail_discussion",
             "market_action"
           ]
         },
         {
-          "external_id": "nvda_stocktwits_st_mock_nvda_1",
+          "external_id": "nvda_stocktwits_st_667842382",
           "source": "stocktwits",
           "outlet": "stocktwits/$NVDA",
-          "title": "$NVDA massive options flow on the monthly calls. Institutional buyers aggressively stepping in here....",
-          "content_text": "$NVDA massive options flow on the monthly calls. Institutional buyers aggressively stepping in here.",
-          "url": "https://stocktwits.com/symbol/NVDA/message/mock_nvda_1",
-          "published_at": "2026-10-31T05:15:07.862519+00:00",
-          "engagement_count": 18,
-          "sentiment_label": "positive",
-          "sentiment_score": 65.0,
-          "confidence": 0.9,
-          "finbert_label": "positive",
-          "finbert_score": 62.3,
+          "title": "$NVDA 😳 Close of $204.64:  - Forward P/E: 21.98×, using the same $9.31 FY2027 adjusted EPS estimate.  -At the $205.25 af...",
+          "content_text": "$NVDA 😳\nClose of $204.64:\n\n- Forward P/E: 21.98×, using the same $9.31 FY2027 adjusted EPS estimate.\n\n-At the $205.25 after-hours price, it’s 22.05×.\n\n- 200-day moving average: $204.39. NVIDIA closed just $0.25—or 0.12%—above it, essentially right on that level.",
+          "url": "https://stocktwits.com/InvertedNegG/message/667842382",
+          "published_at": "2026-10-31T11:11:24Z",
+          "engagement_count": 0,
+          "sentiment_label": "neutral",
+          "sentiment_score": 0.0,
+          "confidence": 0.4519,
+          "finbert_label": "neutral",
+          "finbert_score": 0.0,
           "theme_tags": [
             "retail_positioning"
           ]
         },
         {
-          "external_id": "nvda_stocktwits_st_mock_nvda_2",
+          "external_id": "nvda_stocktwits_st_667842348",
           "source": "stocktwits",
           "outlet": "stocktwits/$NVDA",
-          "title": "$NVDA testing key resistance on high volume. Breakout confirmation above today's high targets +8% up...",
-          "content_text": "$NVDA testing key resistance on high volume. Breakout confirmation above today's high targets +8% upside.",
-          "url": "https://stocktwits.com/symbol/NVDA/message/mock_nvda_2",
-          "published_at": "2026-10-31T05:15:07.862519+00:00",
-          "engagement_count": 25,
-          "sentiment_label": "positive",
-          "sentiment_score": 65.0,
-          "confidence": 0.9,
-          "finbert_label": "positive",
-          "finbert_score": 62.3,
-          "theme_tags": [
-            "technical_analysis"
-          ]
-        },
-        {
-          "external_id": "nvda_stocktwits_st_mock_nvda_3",
-          "source": "stocktwits",
-          "outlet": "stocktwits/$NVDA",
-          "title": "$NVDA RSI reaching overbought conditions on the 4H chart. Trimming 30% of my position before earning...",
-          "content_text": "$NVDA RSI reaching overbought conditions on the 4H chart. Trimming 30% of my position before earnings.",
-          "url": "https://stocktwits.com/symbol/NVDA/message/mock_nvda_3",
-          "published_at": "2026-10-31T05:15:07.862519+00:00",
-          "engagement_count": 9,
-          "sentiment_label": "negative",
-          "sentiment_score": -65.0,
-          "confidence": 0.9,
-          "finbert_label": "negative",
-          "finbert_score": -62.3,
-          "theme_tags": [
-            "technical_analysis"
-          ]
-        },
-        {
-          "external_id": "nvda_stocktwits_st_mock_nvda_4",
-          "source": "stocktwits",
-          "outlet": "stocktwits/$NVDA",
-          "title": "$NVDA retail bears getting squeezed again. Short interest remains elevated, continuation likely tomo...",
-          "content_text": "$NVDA retail bears getting squeezed again. Short interest remains elevated, continuation likely tomorrow.",
-          "url": "https://stocktwits.com/symbol/NVDA/message/mock_nvda_4",
-          "published_at": "2026-10-31T05:15:07.862519+00:00",
-          "engagement_count": 34,
-          "sentiment_label": "positive",
-          "sentiment_score": 65.0,
-          "confidence": 0.9,
-          "finbert_label": "positive",
-          "finbert_score": 62.3,
+          "title": "$NVDA the trump presidency:  The wheel of fortune ☘️ The price is right💰 Let’s make a deal 🤡",
+          "content_text": "$NVDA the trump presidency:\n\nThe wheel of fortune ☘️\nThe price is right💰\nLet’s make a deal 🤡",
+          "url": "https://stocktwits.com/enz12/message/667842348",
+          "published_at": "2026-10-31T11:08:47Z",
+          "engagement_count": 2,
+          "sentiment_label": "neutral",
+          "sentiment_score": 0.0,
+          "confidence": 0.4519,
+          "finbert_label": "neutral",
+          "finbert_score": 0.0,
           "theme_tags": [
             "retail_positioning"
           ]
         },
         {
-          "external_id": "nvda_stocktwits_st_mock_nvda_5",
+          "external_id": "nvda_stocktwits_st_667842236",
           "source": "stocktwits",
           "outlet": "stocktwits/$NVDA",
-          "title": "$NVDA macro headwinds and yield curve pressure keeping multiples capped. Expecting consolidation in ...",
-          "content_text": "$NVDA macro headwinds and yield curve pressure keeping multiples capped. Expecting consolidation in this range.",
-          "url": "https://stocktwits.com/symbol/NVDA/message/mock_nvda_5",
-          "published_at": "2026-10-31T05:15:07.862519+00:00",
-          "engagement_count": 12,
-          "sentiment_label": "negative",
-          "sentiment_score": -65.0,
-          "confidence": 0.9,
-          "finbert_label": "negative",
-          "finbert_score": -62.3,
+          "title": "$NVDA nibbled at 15 more shares yesterday, trimmed some value stocks that have been ripping.",
+          "content_text": "$NVDA nibbled at 15 more shares yesterday, trimmed some value stocks that have been ripping.",
+          "url": "https://stocktwits.com/Austin7819/message/667842236",
+          "published_at": "2026-10-31T11:00:25Z",
+          "engagement_count": 2,
+          "sentiment_label": "neutral",
+          "sentiment_score": 0.0,
+          "confidence": 0.4519,
+          "finbert_label": "neutral",
+          "finbert_score": 0.0,
           "theme_tags": [
             "retail_positioning"
           ]
         },
         {
-          "external_id": "nvda_stocktwits_st_mock_nvda_6",
+          "external_id": "nvda_stocktwits_st_667841772",
           "source": "stocktwits",
           "outlet": "stocktwits/$NVDA",
-          "title": "$NVDA guidance beat expectation, datacenter backlog growing quarter over quarter. Strong long-term h...",
-          "content_text": "$NVDA guidance beat expectation, datacenter backlog growing quarter over quarter. Strong long-term hold.",
-          "url": "https://stocktwits.com/symbol/NVDA/message/mock_nvda_6",
-          "published_at": "2026-10-31T05:15:07.862519+00:00",
-          "engagement_count": 42,
+          "title": "Yeah, $NVDA takes this one. $V is close behind, $KO is next, and $COST keeps the least per 100 by a lot.",
+          "content_text": "Yeah, $NVDA takes this one. $V is close behind, $KO is next, and $COST keeps the least per 100 by a lot.",
+          "url": "https://stocktwits.com/TopOptionsAIerts/message/667841772",
+          "published_at": "2026-10-31T10:08:08Z",
+          "engagement_count": 0,
+          "sentiment_label": "neutral",
+          "sentiment_score": 0.0,
+          "confidence": 0.4519,
+          "finbert_label": "neutral",
+          "finbert_score": 0.0,
+          "theme_tags": [
+            "retail_positioning"
+          ]
+        },
+        {
+          "external_id": "nvda_stocktwits_st_667841754",
+          "source": "stocktwits",
+          "outlet": "stocktwits/$NVDA",
+          "title": "Which of these keeps the most profit from every $100 of revenue?    Nvidia $NVDA  Visa $V  Coca-Cola $KO  Costco $COST  ...",
+          "content_text": "Which of these keeps the most profit from every $100 of revenue? \n \nNvidia $NVDA \nVisa $V \nCoca-Cola $KO \nCostco $COST \n \nHint: Nvidia and Costco both had about $303B in revenue over the last 12 months. \n \nYour guess, before you open the reply? \n \nNFA #stocks",
+          "url": "https://stocktwits.com/ericgeurden/message/667841754",
+          "published_at": "2026-10-31T10:05:57Z",
+          "engagement_count": 3,
           "sentiment_label": "positive",
-          "sentiment_score": 65.0,
-          "confidence": 0.9,
+          "sentiment_score": 77.5,
+          "confidence": 0.8527,
           "finbert_label": "positive",
-          "finbert_score": 62.3,
+          "finbert_score": 77.5,
           "theme_tags": [
             "retail_positioning"
           ]
         },
         {
-          "external_id": "nvda_bluesky_bsky_mock_nvda_1",
+          "external_id": "nvda_stocktwits_st_667841455",
+          "source": "stocktwits",
+          "outlet": "stocktwits/$NVDA",
+          "title": "$NVDA  170 UNITED STATES DOLLAHS",
+          "content_text": "$NVDA  170 UNITED STATES DOLLAHS",
+          "url": "https://stocktwits.com/DarkMode_ON/message/667841455",
+          "published_at": "2026-10-31T09:28:49Z",
+          "engagement_count": 4,
+          "sentiment_label": "neutral",
+          "sentiment_score": 0.0,
+          "confidence": 0.4519,
+          "finbert_label": "neutral",
+          "finbert_score": 0.0,
+          "theme_tags": [
+            "retail_positioning"
+          ]
+        },
+        {
+          "external_id": "nvda_bluesky_bsky_3mz64qpnum42q",
           "source": "bluesky",
-          "outlet": "bluesky/@tech_analyst_1.bsky.social",
-          "title": "Fascinating deep dive on NVDA's current architecture and margins. They have built an unpre...",
-          "content_text": "Fascinating deep dive on NVDA's current architecture and margins. They have built an unprecedented moat in enterprise workflows.",
-          "url": "https://bsky.app/profile/tech_analyst_1.bsky.social/post/mock_nvda_1",
-          "published_at": "2026-10-31T05:15:07.978168+00:00",
+          "outlet": "bluesky/@reuters.com",
+          "title": "From Breakingviews - Breakingviews - COMMENTARY: The Week in Breakingviews: Myopia in Anthropia reut.rs/4iP25gJ",
+          "content_text": "From Breakingviews - Breakingviews - COMMENTARY: The Week in Breakingviews: Myopia in Anthropia reut.rs/4iP25gJ",
+          "url": "https://bsky.app/profile/reuters.com/post/3mz64qpnum42q",
+          "published_at": "2026-10-31T10:50:12Z",
+          "engagement_count": 7,
+          "sentiment_label": "neutral",
+          "sentiment_score": 0.0,
+          "confidence": 0.4519,
+          "finbert_label": "neutral",
+          "finbert_score": 0.0,
+          "theme_tags": [
+            "community_feedback"
+          ]
+        },
+        {
+          "external_id": "nvda_bluesky_bsky_3mz64hr42i72w",
+          "source": "bluesky",
+          "outlet": "bluesky/@reuters.com",
+          "title": "Bangladesh death toll from dengue rises, unlikely to ease before December reut.rs/4zZbQ1F",
+          "content_text": "Bangladesh death toll from dengue rises, unlikely to ease before December reut.rs/4zZbQ1F",
+          "url": "https://bsky.app/profile/reuters.com/post/3mz64hr42i72w",
+          "published_at": "2026-10-31T10:45:11Z",
           "engagement_count": 16,
           "sentiment_label": "neutral",
           "sentiment_score": 0.0,
-          "confidence": 0.75,
+          "confidence": 0.4519,
           "finbert_label": "neutral",
-          "finbert_score": 2.5,
-          "theme_tags": [
-            "tech_innovation"
-          ]
-        },
-        {
-          "external_id": "nvda_bluesky_bsky_mock_nvda_2",
-          "source": "bluesky",
-          "outlet": "bluesky/@tech_analyst_2.bsky.social",
-          "title": "Market reacting favorably to NVDA's latest developer release. Open-source benchmarks show ...",
-          "content_text": "Market reacting favorably to NVDA's latest developer release. Open-source benchmarks show compelling efficiency improvements.",
-          "url": "https://bsky.app/profile/tech_analyst_2.bsky.social/post/mock_nvda_2",
-          "published_at": "2026-10-31T05:15:07.978168+00:00",
-          "engagement_count": 22,
-          "sentiment_label": "neutral",
-          "sentiment_score": 0.0,
-          "confidence": 0.75,
-          "finbert_label": "neutral",
-          "finbert_score": 2.5,
-          "theme_tags": [
-            "tech_innovation"
-          ]
-        },
-        {
-          "external_id": "nvda_bluesky_bsky_mock_nvda_3",
-          "source": "bluesky",
-          "outlet": "bluesky/@tech_analyst_3.bsky.social",
-          "title": "Some legitimate competition emerging against NVDA from cloud hyperscalers. Will be watchin...",
-          "content_text": "Some legitimate competition emerging against NVDA from cloud hyperscalers. Will be watching capex allocation closely next quarter.",
-          "url": "https://bsky.app/profile/tech_analyst_3.bsky.social/post/mock_nvda_3",
-          "published_at": "2026-10-31T05:15:07.978168+00:00",
-          "engagement_count": 28,
-          "sentiment_label": "neutral",
-          "sentiment_score": 0.0,
-          "confidence": 0.75,
-          "finbert_label": "neutral",
-          "finbert_score": 2.5,
+          "finbert_score": 0.0,
           "theme_tags": [
             "community_feedback"
           ]
         },
         {
-          "external_id": "nvda_bluesky_bsky_mock_nvda_4",
+          "external_id": "nvda_bluesky_bsky_3mz646ulurs2p",
           "source": "bluesky",
-          "outlet": "bluesky/@tech_analyst_4.bsky.social",
-          "title": "Interesting to see NVDA sentiment rebound after last week's pullback. Long-term thesis rem...",
-          "content_text": "Interesting to see NVDA sentiment rebound after last week's pullback. Long-term thesis remains firmly intact.",
-          "url": "https://bsky.app/profile/tech_analyst_4.bsky.social/post/mock_nvda_4",
-          "published_at": "2026-10-31T05:15:07.978168+00:00",
-          "engagement_count": 34,
+          "outlet": "bluesky/@reuters.com",
+          "title": "Taipei mayor gets angry reception at Pride after gay bar raid reut.rs/4eaHMYE",
+          "content_text": "Taipei mayor gets angry reception at Pride after gay bar raid reut.rs/4eaHMYE",
+          "url": "https://bsky.app/profile/reuters.com/post/3mz646ulurs2p",
+          "published_at": "2026-10-31T10:40:13Z",
+          "engagement_count": 13,
           "sentiment_label": "neutral",
           "sentiment_score": 0.0,
-          "confidence": 0.75,
+          "confidence": 0.4519,
           "finbert_label": "neutral",
-          "finbert_score": 2.5,
+          "finbert_score": 0.0,
           "theme_tags": [
             "community_feedback"
           ]
         },
         {
-          "external_id": "nvda_bluesky_bsky_mock_nvda_5",
+          "external_id": "nvda_bluesky_bsky_3mz63ncy6fg2i",
           "source": "bluesky",
-          "outlet": "bluesky/@tech_analyst_5.bsky.social",
-          "title": "Regulatory headwinds and antitrust questions may slow down NVDA's acquisition pipeline ove...",
-          "content_text": "Regulatory headwinds and antitrust questions may slow down NVDA's acquisition pipeline over the next 12 months.",
-          "url": "https://bsky.app/profile/tech_analyst_5.bsky.social/post/mock_nvda_5",
-          "published_at": "2026-10-31T05:15:07.978168+00:00",
-          "engagement_count": 40,
+          "outlet": "bluesky/@reuters.com",
+          "title": "UK PM Burnham says he is 'open' to formal apology for slavery, but rules out reparations reut.rs/4yOeZ3p",
+          "content_text": "UK PM Burnham says he is 'open' to formal apology for slavery, but rules out reparations reut.rs/4yOeZ3p",
+          "url": "https://bsky.app/profile/reuters.com/post/3mz63ncy6fg2i",
+          "published_at": "2026-10-31T10:30:24Z",
+          "engagement_count": 14,
           "sentiment_label": "neutral",
           "sentiment_score": 0.0,
-          "confidence": 0.75,
+          "confidence": 0.4519,
           "finbert_label": "neutral",
-          "finbert_score": 2.5,
+          "finbert_score": 0.0,
           "theme_tags": [
             "community_feedback"
           ]
         },
         {
-          "external_id": "nvda_gdelt_gdelt_d3337e1323f5",
+          "external_id": "nvda_bluesky_bsky_3mz63dx55v624",
+          "source": "bluesky",
+          "outlet": "bluesky/@reuters.com",
+          "title": "Preschool case tests religious conservatives' US Supreme Court win streak reut.rs/4jR4p81",
+          "content_text": "Preschool case tests religious conservatives' US Supreme Court win streak reut.rs/4jR4p81",
+          "url": "https://bsky.app/profile/reuters.com/post/3mz63dx55v624",
+          "published_at": "2026-10-31T10:25:10Z",
+          "engagement_count": 8,
+          "sentiment_label": "neutral",
+          "sentiment_score": 0.0,
+          "confidence": 0.4519,
+          "finbert_label": "neutral",
+          "finbert_score": 0.0,
+          "theme_tags": [
+            "community_feedback"
+          ]
+        },
+        {
+          "external_id": "nvda_gdelt_gdelt_live_4882120749452487917",
           "source": "gdelt",
-          "outlet": "reuters.com",
-          "title": "NVDA Outlines Ambitious Capital Allocation Strategy Amid Accelerating Enterprise Demand",
-          "content_text": "NVDA Outlines Ambitious Capital Allocation Strategy Amid Accelerating Enterprise Demand. Executives pointed to record adoption curves and strong customer retention metrics, projecting double-digit growth in key international segments. Reported by Reuters.",
-          "url": "https://www.reuters.com/business/nvda-outlines-ambitious-capital-allocation-st",
-          "published_at": "2026-10-31T04:15:08.116155+00:00",
+          "outlet": "Yahoo Finance",
+          "title": "NVDA Stock Drops: Nvidia May Back Data Center Loan Its Own Customer, Analyst Sees Little Impact From Intel’s Weak Report - Yahoo Finance",
+          "content_text": "NVDA Stock Drops: Nvidia May Back Data Center Loan Its Own Customer, Analyst Sees Little Impact From Intel’s Weak Report - Yahoo Finance",
+          "url": "https://news.google.com/rss/articles/CBMilwFBVV95cUxQTGdFWTJ1Wm1ISjFPRjVLdVowSFF0RHpiODd4cldVU1VEX3FUU1VFc3hROVlzM3Nsd0RONGE2emNfZ1hsTm9MUUNUR05IWFFnVTJpeEV4TjMzRTZ5eG1scm0yT1VOTWF1X2F1VmoxeG9NaUJqa1hKX0JlbDhGVmY5dEhZcUc0d2hBMGdNUWo2eDdyMlJ0Y3dZ?oc=5",
+          "published_at": "2026-10-31T11:12:06.796473+00:00",
           "engagement_count": 25,
-          "sentiment_label": "positive",
-          "sentiment_score": 85.0,
-          "confidence": 0.75,
-          "finbert_label": "positive",
-          "finbert_score": 80.7,
-          "theme_tags": [
-            "global_news",
-            "market_intelligence"
-          ]
-        },
-        {
-          "external_id": "nvda_gdelt_gdelt_b72b8996a963",
-          "source": "gdelt",
-          "outlet": "bloomberg.com",
-          "title": "Global Supply Chain Dynamics and Trade Policy Scrutiny Reshape Outlook for NVDA",
-          "content_text": "Global Supply Chain Dynamics and Trade Policy Scrutiny Reshape Outlook for NVDA. Industry analysts monitor regional component supply chains and potential tariff adjustments that could impact operating margins next quarter. Reported by Bloomberg News.",
-          "url": "https://www.bloomberg.com/business/global-supply-chain-dynamics-and-trade-policy",
-          "published_at": "2026-10-31T01:15:08.116155+00:00",
-          "engagement_count": 23,
           "sentiment_label": "negative",
-          "sentiment_score": -40.0,
-          "confidence": 0.75,
+          "sentiment_score": -46.7,
+          "confidence": 0.642,
           "finbert_label": "negative",
-          "finbert_score": -39.3,
-          "theme_tags": [
-            "global_news",
-            "market_intelligence"
-          ]
-        },
-        {
-          "external_id": "nvda_gdelt_gdelt_21f29300af97",
-          "source": "gdelt",
-          "outlet": "ft.com",
-          "title": "Institutional Investors Weigh Valuation Premiums as NVDA Expands High-Margin Product Suite",
-          "content_text": "Institutional Investors Weigh Valuation Premiums as NVDA Expands High-Margin Product Suite. Brokerage research desks upgraded long-term price targets, highlighting resilient cash flows and defensible intellectual property. Reported by Financial Times.",
-          "url": "https://www.ft.com/business/institutional-investors-weigh-valuation-premi",
-          "published_at": "2026-10-30T22:15:08.116155+00:00",
-          "engagement_count": 21,
-          "sentiment_label": "positive",
-          "sentiment_score": 40.0,
-          "confidence": 0.75,
-          "finbert_label": "positive",
-          "finbert_score": 39.3,
-          "theme_tags": [
-            "global_news",
-            "market_intelligence"
-          ]
-        },
-        {
-          "external_id": "nvda_gdelt_gdelt_a8f51a06ff22",
-          "source": "gdelt",
-          "outlet": "wsj.com",
-          "title": "Regulatory Filings Reveal Key Strategic Partnerships and Infrastructure Investment from NVDA",
-          "content_text": "Regulatory Filings Reveal Key Strategic Partnerships and Infrastructure Investment from NVDA. The latest disclosures demonstrate expanding cross-sector alliances, strengthening competitive moats against emerging global challengers. Reported by The Wall Street Journal.",
-          "url": "https://www.wsj.com/business/regulatory-filings-reveal-key-strategic-partn",
-          "published_at": "2026-10-30T19:15:08.116155+00:00",
-          "engagement_count": 19,
-          "sentiment_label": "positive",
-          "sentiment_score": 55.0,
-          "confidence": 0.75,
-          "finbert_label": "positive",
-          "finbert_score": 53.1,
+          "finbert_score": -46.7,
           "theme_tags": [
             "global_news",
             "market_intelligence"
@@ -1035,12 +997,12 @@
           "volume": 168039400,
           "daily_return": -0.04222,
           "change_pct": -4.22,
-          "pulse_index": 33.9,
-          "finbert_index": 32.0,
-          "positive_count": 13,
-          "neutral_count": 5,
-          "negative_count": 5,
-          "total_volume": 23,
+          "pulse_index": 23.5,
+          "finbert_index": 22.3,
+          "positive_count": 7,
+          "neutral_count": 12,
+          "negative_count": 2,
+          "total_volume": 21,
           "divergence_flag": true,
           "divergence_type": "bullish_divergence"
         }
@@ -13964,18 +13926,18 @@
       "handle": "u/OpenAI",
       "role": "AI Research & Enterprise Releases",
       "sentiment_signal": "NEUTRAL",
-      "posts_analyzed": 3,
+      "posts_analyzed": 4,
       "key_themes": [
         "reddit_submissions",
         "public_updates"
       ],
       "milestones": [
-        "[r/OpenAI] Introducing our next-generation reasoning model and updated API benchmarks",
-        "[r/MachineLearning] Safety evaluation framework & system card publication",
-        "[r/IAmA] AMA: Chat with our engineering and research teams about recent releases"
+        "[r/ChatGPT] Introducing ChatGPT Images 2.5",
+        "[r/codex] WebMCP Challenge",
+        "[r/OpenAI] A note from Tibo"
       ],
-      "executive_summary": "Recent submissions from u/OpenAI across 3 posts. Key activity observed in r/OpenAI, r/MachineLearning, r/IAmA.",
-      "generated_at": "2026-10-31T05:15:55.552595+00:00"
+      "executive_summary": "Recent submissions from u/OpenAI across 4 posts. Key activity observed in r/codex, r/OpenAI, r/ChatGPT.",
+      "generated_at": "2026-10-31T11:12:07.287483+00:00"
     },
     {
       "platform": "StockTwits",
@@ -13989,12 +13951,12 @@
         "equities"
       ],
       "milestones": [
-        "Added to our top semiconductor holdings today. Risk/reward looks very attractive at curren...",
-        "Market breadth is improving across tech and industrials. Staying long index futures....",
-        "Trimmed our momentum swing positions ahead of upcoming CPI data print...."
+        "@BullseyeGains ya impressive. i use it every day",
+        "@KingTrades09 yes yes",
+        "$ORCL they are throwing everything at this to get a bottom in and it seems to only make it worse.   it’s become a trump ..."
       ],
-      "executive_summary": "Analyzed 4 recent messages from StockTwits account @howardlindzon. Overall sentiment signal is BULLISH (2 bullish signals vs 0 bearish signals). Key recent commentary covers market breadth, risk management, and tactical sector positioning.",
-      "generated_at": "2026-10-31T05:15:55.660423+00:00"
+      "executive_summary": "Analyzed 4 recent messages from StockTwits account @howardlindzon. Overall sentiment signal is BULLISH (1 bullish signals vs 0 bearish signals). Key recent commentary covers market breadth, risk management, and tactical sector positioning.",
+      "generated_at": "2026-10-31T11:12:07.469863+00:00"
     },
     {
       "platform": "Bluesky",
@@ -14008,12 +13970,12 @@
         "community_milestones"
       ],
       "milestones": [
-        "Excited to announce our latest technical preview! Huge thanks to our engineering and resea...",
-        "We are rolling out new developer APIs today with 50% lower latency and updated documentati...",
-        "Reflecting on our milestones this quarter: community adoption has exceeded all our interna..."
+        "Well sir, there's nothing on Earth like a genuine, bona-fide, electrified, six-car monorail!",
+        "To try the moderation inbox, enable beta features under Settings, then open Settings > Moderation tools > Moderation inb...",
+        "The moderation inbox also reaches you no matter where your account is hosted. Until now, we didn't have a way of keeping..."
       ],
       "executive_summary": "Analyzed 4 recent public Bluesky updates from @bsky.app. Posts emphasize platform development, community milestones, and active product iteration. Overall sentiment tone is positive and forward-looking.",
-      "generated_at": "2026-10-31T05:15:55.780460+00:00"
+      "generated_at": "2026-10-31T11:12:07.704061+00:00"
     }
   ]
 }

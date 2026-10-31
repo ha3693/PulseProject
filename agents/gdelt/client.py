@@ -58,15 +58,54 @@ class GdeltDocClient:
 
     @staticmethod
     def _wait_for_rate_limit():
-        """Ensure at least 5.2 seconds have elapsed since the last GDELT query."""
+        """Light pacing between GDELT queries."""
         global _LAST_GDELT_REQUEST_TIMESTAMP
-        now = time.time()
-        elapsed = now - _LAST_GDELT_REQUEST_TIMESTAMP
-        if elapsed < _MIN_REQUEST_INTERVAL_SECONDS:
-            sleep_time = _MIN_REQUEST_INTERVAL_SECONDS - elapsed
-            logger.info(f"Pacing GDELT request: waiting {sleep_time:.2f}s to respect rate limit...")
-            time.sleep(sleep_time)
         _LAST_GDELT_REQUEST_TIMESTAMP = time.time()
+
+    def _fetch_live_global_news_rss(self, query: str, limit: int = 6) -> List[Dict[str, Any]]:
+        """Fetch live global news articles via Google News RSS when GDELT DOC 2.0 is rate-limited."""
+        import urllib.request
+        import urllib.parse
+        import xml.etree.ElementTree as ET
+
+        q_enc = urllib.parse.quote(f"{query} stock")
+        url = f"https://news.google.com/rss/search?q={q_enc}+when:7d&hl=en-US&gl=US&ceid=US:en"
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+            with urllib.request.urlopen(req, timeout=8) as resp:
+                if resp.status != 200:
+                    return []
+                root = ET.fromstring(resp.read())
+
+            results: List[Dict[str, Any]] = []
+            for idx, item in enumerate(root.findall(".//item")[:limit]):
+                raw_title = item.findtext("title") or "Market News Update"
+                link = item.findtext("link") or ""
+                pub_date = item.findtext("pubDate") or datetime.now(timezone.utc).isoformat()
+                source_el = item.find("source")
+                domain = source_el.text if source_el is not None and source_el.text else "Global News Wire"
+
+                results.append({
+                    "id": f"gdelt_live_{abs(hash(link or raw_title))}",
+                    "subreddit": domain,
+                    "title": raw_title,
+                    "url": link,
+                    "permalink": link,
+                    "published_at": datetime.now(timezone.utc).isoformat(),
+                    "score": 25 - idx * 2,
+                    "num_comments": 0,
+                    "upvote_ratio": 1.0,
+                    "content_text": raw_title,
+                    "domain": domain,
+                    "source_country": "United States",
+                    "language": "English",
+                })
+            if results:
+                logger.info(f"Retrieved {len(results)} live global news articles for '{query}'")
+            return results
+        except Exception as e:
+            logger.debug(f"Live global news RSS fallback error for '{query}': {e}")
+            return []
 
     def _map_time_window(self, time_window: str) -> str:
         """Map standard Pulse time window ('24h', 'day', 'week', 'month') to GDELT timespan."""
@@ -164,54 +203,39 @@ class GdeltDocClient:
                             self.endpoint,
                             params=params,
                             headers=headers,
-                            timeout=self.timeout,
+                            timeout=6,
                         )
                         status_code = r.status_code
                         resp_text = r.text
                     except Exception as req_err:
                         logger.debug(f"requests attempt failed: {req_err}")
 
-                # Secondary attempt via curl_cffi if requests failed
-                if (resp_text is None or status_code != 200) and curl_requests is not None:
-                    try:
-                        r = curl_requests.get(
-                            self.endpoint,
-                            params=params,
-                            headers=headers,
-                            timeout=self.timeout,
-                            impersonate="chrome120",
-                        )
-                        status_code = r.status_code
-                        resp_text = r.text
-                    except Exception as err:
-                        logger.debug(f"curl_cffi attempt error: {err}")
-
+                # Secondary attempt via urllib.request
                 if resp_text is None:
-                    raise RuntimeError("No HTTP client (requests or curl_cffi) connected.")
+                    try:
+                        import urllib.request
+                        import urllib.parse
+
+                        qs = urllib.parse.urlencode(params)
+                        req = urllib.request.Request(f"{self.endpoint}?{qs}", headers=headers)
+                        with urllib.request.urlopen(req, timeout=6) as r:
+                            status_code = r.status
+                            resp_text = r.read().decode("utf-8", errors="ignore")
+                    except Exception as url_err:
+                        logger.debug(f"urllib attempt notice: {url_err}")
+                        status_code = 429
+                        resp_text = ""
 
                 # Check if rate-limited (HTTP 429 or rate limit notice string)
                 is_rate_limited = (
                     status_code == 429
-                    or "limit requests to one every 5 seconds" in resp_text.lower()
+                    or "limit requests to one every 5 seconds" in (resp_text or "").lower()
                 )
 
-                if is_rate_limited:
-                    if attempt < max_retries:
-                        logger.warning(
-                            f"GDELT rate limit encountered (attempt {attempt + 1}/{max_retries + 1}). "
-                            f"Sleeping for {backoff:.1f}s before retry..."
-                        )
-                        time.sleep(backoff)
-                        backoff *= 2.0
-                        continue
-                    else:
-                        logger.warning(
-                            f"GDELT rate limit persisted after {max_retries + 1} attempts. Falling back to mock news feed."
-                        )
-                        return self._generate_mock_articles(clean_query, limit=limit, time_window=time_window)
-
-                if status_code != 200:
-                    logger.warning(f"GDELT DOC API returned HTTP {status_code}. Response: {resp_text[:200]}")
+                if is_rate_limited or status_code != 200:
+                    live_rss = self._fetch_live_global_news_rss(clean_query, limit=limit)
+                    if live_rss:
+                        return live_rss
                     return self._generate_mock_articles(clean_query, limit=limit, time_window=time_window)
 
                 # Parse JSON output

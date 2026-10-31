@@ -123,7 +123,7 @@ def main():
 
     if args.ingest or args.schedule:
         from agents.scheduler import PulseIngestionOrchestrator
-        orchestrator = PulseIngestionOrchestrator(use_mock=True)
+        orchestrator = PulseIngestionOrchestrator(use_mock=args.mock)
         if args.schedule:
             import time
             print("🕒 Starting Pulse Scheduled Ingestion Daemon (every 6 hours)...")

@@ -292,7 +292,7 @@ def execute_supabase_sql(query: str) -> Any:
 class PulseIngestionOrchestrator:
     """Runs all Pulse intelligence agents and synchronizes signals with Supabase."""
 
-    def __init__(self, use_mock: bool = True):
+    def __init__(self, use_mock: bool = False):
         self.use_mock = use_mock
         self.yahoo_agent = YahooFinanceAgent()
         self.reddit_agent = RedditMarketAgent()
@@ -804,10 +804,10 @@ def main():
     parser.add_argument("--daemon", action="store_true", help="Run continuously on a recurring schedule")
     parser.add_argument("--interval", type=int, default=21600, help="Daemon interval in seconds (default: 6h = 21600s)")
     parser.add_argument("--no-db", action="store_true", help="Skip Supabase DB sync (local snapshot only)")
-    parser.add_argument("--live", action="store_true", help="Attempt live external API calls instead of deterministic mock feeds")
+    parser.add_argument("--mock", action="store_true", help="Use deterministic synthetic mock feeds instead of live APIs")
 
     args = parser.parse_args()
-    orchestrator = PulseIngestionOrchestrator(use_mock=not args.live)
+    orchestrator = PulseIngestionOrchestrator(use_mock=args.mock)
 
     if args.daemon:
         logger.info(f"🕒 Starting Pulse Scheduled Ingestion Daemon (interval={args.interval}s)...")

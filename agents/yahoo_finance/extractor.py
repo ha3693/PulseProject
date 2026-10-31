@@ -6,7 +6,10 @@ EOD market metrics, and rich article metadata with mock fallback capability.
 
 import os
 import re
+import json
 import logging
+import urllib.parse
+import urllib.request
 from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional, Tuple
 
@@ -65,18 +68,22 @@ def resolve_topic_to_symbol(topic: str) -> Tuple[Optional[str], str]:
     if topic.isupper() and 1 <= len(topic) <= 6 and topic.isalpha():
         return topic, f"{topic} Equity"
 
-    # Dynamic search via yfinance
+    # Dynamic search via Yahoo Finance HTTP v1 search endpoint
     try:
-        import yfinance as yf
-        search = yf.Search(topic, max_results=3, news_count=0)
-        if search.quotes and len(search.quotes) > 0:
-            first = search.quotes[0]
+        q_enc = urllib.parse.quote(topic.strip())
+        url = f"https://query2.finance.yahoo.com/v1/finance/search?q={q_enc}&quotesCount=3&newsCount=0"
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=6) as resp:
+            payload = json.loads(resp.read().decode("utf-8"))
+        quotes = payload.get("quotes") or []
+        if quotes:
+            first = quotes[0]
             symbol = first.get("symbol")
             name = first.get("shortname") or first.get("longname") or symbol
-            logger.info(f"Resolved topic '{topic}' to symbol '{symbol}' ({name}) via search.")
+            logger.info(f"Resolved topic '{topic}' to symbol '{symbol}' ({name}) via Yahoo Finance API.")
             return symbol, name
     except Exception as e:
-        logger.warning(f"Error resolving topic '{topic}' via yf.Search: {e}")
+        logger.debug(f"Yahoo search fallback for '{topic}': {e}")
 
     # Fallback to uppercase query
     clean_topic = topic.strip().upper()
@@ -85,47 +92,32 @@ def resolve_topic_to_symbol(topic: str) -> Tuple[Optional[str], str]:
 
 def fetch_eod_market_data(symbol: str) -> Optional[Dict[str, Any]]:
     """
-    Fetch End-of-Day (EOD) or latest trading session quotes and price statistics.
+    Fetch End-of-Day (EOD) or latest trading session quotes and price statistics via Yahoo v8 Chart API.
     """
     if not symbol:
         return None
 
     try:
-        import yfinance as yf
-        ticker = yf.Ticker(symbol)
-        fast_info = getattr(ticker, "fast_info", None)
+        sym_enc = urllib.parse.quote(symbol.strip())
+        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{sym_enc}?range=5d&interval=1d"
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=6) as resp:
+            payload = json.loads(resp.read().decode("utf-8"))
 
-        last_price = None
-        prev_close = None
-        day_high = None
-        day_low = None
-        volume = None
-        currency = "USD"
+        res = payload["chart"]["result"][0]
+        meta = res.get("meta", {})
+        quote = (res.get("indicators", {}).get("quote") or [{}])[0]
+        closes = [c for c in (quote.get("close") or []) if c is not None]
+        highs = [h for h in (quote.get("high") or []) if h is not None]
+        lows = [l for l in (quote.get("low") or []) if l is not None]
+        vols = [v for v in (quote.get("volume") or []) if v is not None]
 
-        if fast_info is not None:
-            try:
-                last_price = getattr(fast_info, "last_price", None)
-                prev_close = getattr(fast_info, "previous_close", None)
-                day_high = getattr(fast_info, "day_high", None)
-                day_low = getattr(fast_info, "day_low", None)
-                volume = getattr(fast_info, "last_volume", None)
-                currency = getattr(fast_info, "currency", "USD")
-            except Exception:
-                pass
-
-        # If fast_info was missing values, try history(period="5d")
-        if last_price is None or prev_close is None:
-            try:
-                hist = ticker.history(period="5d")
-                if not hist.empty:
-                    last_price = float(hist["Close"].iloc[-1])
-                    if len(hist) > 1:
-                        prev_close = float(hist["Close"].iloc[-2])
-                    day_high = float(hist["High"].iloc[-1])
-                    day_low = float(hist["Low"].iloc[-1])
-                    volume = int(hist["Volume"].iloc[-1])
-            except Exception:
-                pass
+        last_price = meta.get("regularMarketPrice") or (closes[-1] if closes else None)
+        prev_close = meta.get("chartPreviousClose") or (closes[-2] if len(closes) > 1 else last_price)
+        day_high = highs[-1] if highs else last_price
+        day_low = lows[-1] if lows else last_price
+        volume = vols[-1] if vols else 0
+        currency = meta.get("currency", "USD")
 
         if last_price is not None:
             last_price = round(float(last_price), 2)
@@ -135,7 +127,7 @@ def fetch_eod_market_data(symbol: str) -> Optional[Dict[str, Any]]:
 
             return {
                 "symbol": symbol,
-                "name": symbol,
+                "name": meta.get("longName") or meta.get("shortName") or symbol,
                 "last_price": last_price,
                 "previous_close": prev_close,
                 "change": change,
@@ -144,7 +136,7 @@ def fetch_eod_market_data(symbol: str) -> Optional[Dict[str, Any]]:
                 "day_low": round(float(day_low), 2) if day_low is not None else None,
                 "volume": int(volume) if volume is not None else None,
                 "currency": currency or "USD",
-                "market_state": "CLOSED",
+                "market_state": "REGULAR",
                 "as_of": datetime.now(timezone.utc).isoformat(),
             }
     except Exception as e:
@@ -252,33 +244,30 @@ def fetch_yahoo_finance_news(
         return _get_mock_feed(topic, resolved_symbol, asset_name, limit)
 
     try:
-        import yfinance as yf
-
-        # Step 1: EOD Market Snapshot
+        # Step 1: EOD Market Snapshot via Yahoo Finance v8 Chart API
         eod_data = fetch_eod_market_data(resolved_symbol) if resolved_symbol else None
         if eod_data and asset_name:
             eod_data["name"] = asset_name
 
-        # Step 2: Fetch News via yf.Search with intelligent query variations
+        # Step 2: Fetch Live News via Yahoo Finance v1 Search API
         queries_to_try = []
         clean_t = topic.strip()
-        if clean_t.isupper() and len(clean_t) <= 5:
-            queries_to_try.append(f"{clean_t} stock")
+        if resolved_symbol:
+            queries_to_try.append(resolved_symbol)
+        if clean_t and clean_t not in queries_to_try:
             queries_to_try.append(clean_t)
-        elif asset_name and asset_name != clean_t:
-            queries_to_try.append(f"{clean_t} stock")
-            queries_to_try.append(clean_t)
-        else:
-            queries_to_try.append(clean_t)
-            queries_to_try.append(f"{clean_t} stock")
 
         seen_links = set()
         articles = []
 
         for q in queries_to_try:
             try:
-                search = yf.Search(q, max_results=5, news_count=max(limit, 6))
-                raw_news = getattr(search, "news", []) or []
+                q_enc = urllib.parse.quote(q)
+                url = f"https://query2.finance.yahoo.com/v1/finance/search?q={q_enc}&quotesCount=3&newsCount={max(limit * 2, 10)}"
+                req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+                with urllib.request.urlopen(req, timeout=8) as resp:
+                    payload = json.loads(resp.read().decode("utf-8"))
+                raw_news = payload.get("news") or []
                 for item in raw_news:
                     link = item.get("link", "")
                     if not link or link in seen_links:
@@ -300,7 +289,7 @@ def fetch_yahoo_finance_news(
                     publisher_name = item.get("publisher", "Yahoo Finance")
                     title_text = item.get("title", "Untitled News")
                     articles.append({
-                        "id": str(item.get("uuid") or hash(link)),
+                        "id": str(item.get("uuid") or abs(hash(link))),
                         "subreddit": publisher_name,
                         "publisher": publisher_name,
                         "title": title_text,
@@ -319,14 +308,12 @@ def fetch_yahoo_finance_news(
                     if len(articles) >= limit:
                         break
             except Exception as e:
-                logger.warning(f"Error querying yf.Search('{q}'): {e}")
+                logger.warning(f"Error querying Yahoo Finance news for '{q}': {e}")
 
             if len(articles) >= limit:
                 break
 
-        # Step 3: Fast parallel snippet enrichment
-        if enrich_snippets and articles:
-            _enrich_articles_parallel(articles, max_articles=min(len(articles), 5))
+        logger.info(f"Retrieved {len(articles)} live Yahoo Finance news articles for '{topic}'")
 
         # Fallback to mock data if Yahoo returned 0 articles (network safeguard)
         if not articles:

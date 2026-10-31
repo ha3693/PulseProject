@@ -48,8 +48,17 @@ def fetch_user_submissions(
     """
     clean_username = username.strip().lstrip("u/").lstrip("/u/")
     
-    if use_mock or requests is None:
+    if use_mock:
         logger.info(f"Using mock submissions generator for u/{clean_username}")
+        return _generate_mock_user_posts(clean_username, limit)
+
+    # Try live Reddit Atom/RSS feed first (fast, works via urllib.request without OAuth)
+    rss_result = _fetch_via_rss(clean_username, limit=limit, user_agent=user_agent, max_body_chars=max_body_chars)
+    if rss_result and rss_result.get("success") and rss_result.get("posts"):
+        logger.info(f"Retrieved {len(rss_result['posts'])} live Reddit submissions for u/{clean_username}")
+        return rss_result
+
+    if requests is None:
         return _generate_mock_user_posts(clean_username, limit)
 
     url = f"https://www.reddit.com/user/{clean_username}/submitted.json"
@@ -211,12 +220,16 @@ def _fetch_via_rss(
     }
 
     try:
-        resp = requests.get(url, headers=headers, timeout=10)
-        if resp.status_code != 200:
-            logger.warning(f"Reddit RSS endpoint returned status {resp.status_code}")
-            return None
+        import urllib.request
 
-        root = ET.fromstring(resp.content)
+        req = urllib.request.Request(url, headers=headers)
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            if resp.status != 200:
+                logger.warning(f"Reddit RSS endpoint returned status {resp.status}")
+                return None
+            raw_xml = resp.read()
+
+        root = ET.fromstring(raw_xml)
         ns = {"atom": "http://www.w3.org/2005/Atom"}
         posts = []
 
