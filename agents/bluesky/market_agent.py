@@ -8,8 +8,12 @@ import logging
 from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
 
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import JsonOutputParser
+try:
+    from langchain_core.prompts import ChatPromptTemplate
+    from langchain_core.output_parsers import JsonOutputParser
+except ImportError:
+    ChatPromptTemplate = None
+    JsonOutputParser = None
 
 from agents.base import BaseAgent
 from agents.schemas import SignalReport, PostItem

@@ -16,7 +16,15 @@ except ImportError:
             for k, v in kwargs.items():
                 setattr(self, k, v)
         def model_dump(self):
-            return {k: v for k, v in self.__dict__.items() if not k.startswith("_")}
+            def _dump(val):
+                if hasattr(val, "model_dump"):
+                    return val.model_dump()
+                elif isinstance(val, list):
+                    return [_dump(x) for x in val]
+                elif isinstance(val, dict):
+                    return {k: _dump(v) for k, v in val.items()}
+                return val
+            return {k: _dump(v) for k, v in self.__dict__.items() if not k.startswith("_")}
     def Field(default=None, default_factory=None, **kwargs):
         if default_factory is not None:
             return default_factory()

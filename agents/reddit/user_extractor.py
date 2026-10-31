@@ -8,7 +8,10 @@ import time
 import logging
 from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
-import requests
+try:
+    import requests
+except ImportError:
+    requests = None
 
 logger = logging.getLogger("RedditExtractor")
 if not logger.handlers:
@@ -45,7 +48,7 @@ def fetch_user_submissions(
     """
     clean_username = username.strip().lstrip("u/").lstrip("/u/")
     
-    if use_mock:
+    if use_mock or requests is None:
         logger.info(f"Using mock submissions generator for u/{clean_username}")
         return _generate_mock_user_posts(clean_username, limit)
 

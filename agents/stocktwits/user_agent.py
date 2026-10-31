@@ -9,8 +9,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Any, Optional, List
 
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import JsonOutputParser
+try:
+    from langchain_core.prompts import ChatPromptTemplate
+    from langchain_core.output_parsers import JsonOutputParser
+except ImportError:
+    ChatPromptTemplate = None
+    JsonOutputParser = None
 
 from agents.base import BaseAgent
 from agents.stocktwits.user_extractor import fetch_stocktwits_user_messages

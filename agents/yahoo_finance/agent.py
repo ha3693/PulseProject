@@ -6,9 +6,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Any, Optional, List
 
-from langchain_core.tools import tool
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import JsonOutputParser
+try:
+    from langchain_core.tools import tool
+    from langchain_core.prompts import ChatPromptTemplate
+    from langchain_core.output_parsers import JsonOutputParser
+except ImportError:
+    def tool(fn):
+        return fn
+    ChatPromptTemplate = None
+    JsonOutputParser = None
 
 from agents.base import BaseAgent
 from agents.schemas import SignalReport, PostItem, EODMarketContext
