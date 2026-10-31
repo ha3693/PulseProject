@@ -1,10 +1,19 @@
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import { loadPulseTerminalData } from '@/lib/data/loadPulseData'
 import { AssetSignal } from '@/components/PulseTerminal'
 
 export const dynamic = 'force-dynamic'
 
-export default async function HomePage() {
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams?: { code?: string }
+}) {
+  if (searchParams?.code) {
+    redirect(`/auth/callback?code=${encodeURIComponent(searchParams.code)}`)
+  }
+
   const { snapshot, user } = await loadPulseTerminalData()
   const assets: AssetSignal[] = snapshot?.assets || []
 

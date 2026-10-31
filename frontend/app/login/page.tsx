@@ -1,10 +1,26 @@
+import { redirect } from 'next/navigation'
+import { createClient } from '@/lib/supabase/server'
 import { login, signup } from './actions'
 
-export default function LoginPage({
+export const dynamic = 'force-dynamic'
+
+export default async function LoginPage({
   searchParams,
 }: {
   searchParams: { message?: string; error?: string; redirectTo?: string }
 }) {
+  try {
+    const supabase = await createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (user) {
+      redirect(searchParams.redirectTo || '/dashboard')
+    }
+  } catch {
+    // Continue to login view
+  }
+
   return (
     <div className="container" style={{ paddingTop: '5rem', paddingBottom: '5rem' }}>
       <div
