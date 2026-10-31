@@ -785,10 +785,15 @@ class PulseIngestionOrchestrator:
             "social_radar": social_radar,
         }
 
-        with open(snapshot_path, "w", encoding="utf-8") as f:
-            json.dump(snapshot_payload, f, indent=2, ensure_ascii=False)
-
-        logger.info(f"📦 Saved frontend snapshot to {snapshot_path} ({duration_ms} ms)")
+        try:
+            with open(snapshot_path, "w", encoding="utf-8") as f:
+                json.dump(snapshot_payload, f, indent=2, ensure_ascii=False)
+            logger.info(f"📦 Saved frontend snapshot to {snapshot_path} ({duration_ms} ms)")
+        except OSError:
+            tmp_snap = Path("/tmp/pulse_snapshot.json")
+            with open(tmp_snap, "w", encoding="utf-8") as f:
+                json.dump(snapshot_payload, f, indent=2, ensure_ascii=False)
+            logger.info(f"📦 Saved frontend snapshot to {tmp_snap} ({duration_ms} ms)")
         return snapshot_payload
 
 

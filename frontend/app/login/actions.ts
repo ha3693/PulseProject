@@ -95,11 +95,15 @@ export async function signup(formData: FormData) {
     redirect('/login?error=Password must be at least 6 characters')
   }
 
+  const siteUrl =
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000')
+
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
-      emailRedirectTo: 'http://localhost:3000/auth/callback',
+      emailRedirectTo: `${siteUrl}/auth/callback`,
       data: {
         full_name: fullName || email.split('@')[0],
       },

@@ -162,9 +162,15 @@ class BaseAgent(ABC):
     def __init__(self, output_dir: Optional[str] = None):
         if output_dir:
             self.output_dir = Path(output_dir)
+        elif os.getenv("VERCEL"):
+            self.output_dir = Path("/tmp/pulse_output")
         else:
             self.output_dir = Path(__file__).resolve().parent.parent / "output"
-        self.output_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            self.output_dir.mkdir(parents=True, exist_ok=True)
+        except OSError:
+            self.output_dir = Path("/tmp/pulse_output")
+            self.output_dir.mkdir(parents=True, exist_ok=True)
         self.llm = get_llm()
         self._finbert = None
 
