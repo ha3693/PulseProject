@@ -1,39 +1,12 @@
-# Pulse Intelligence & Agents Dependencies
+# Pulse Intelligence & Agents Runtime Dependencies (Serverless-Optimized < 50 MB)
 # Core & Utilities
 requests>=2.31.0
-aiohttp>=3.9.3
 python-dotenv>=1.0.1
 pydantic>=2.6.0
-
-# Financial Data & Market Feeds
-yfinance>=0.2.36
-pandas>=2.2.0
-numpy>=1.26.0
-scipy>=1.12.0
-scikit-learn>=1.4.0
-curl_cffi>=0.7.0
 beautifulsoup4>=4.11.1
 
-# Reddit API Client
-praw>=7.7.1
-
-# LangChain & Multi-Provider AI
-langchain>=0.2.0
+# LangChain & Multi-Provider AI (Lightweight API Clients)
 langchain-core>=0.2.0
-langchain-community>=0.2.0
 langchain-openai>=0.1.0
 langchain-google-genai>=1.0.0
-openai>=1.13.0
-anthropic>=0.18.0
-google-generativeai>=0.4.0
-
-# NLP, Transformers & Sentiment Benchmarking
-transformers>=4.38.0
-torch>=2.2.0
-
-# Database & Supabase
-supabase>=2.3.0
-
-# Testing & Linting
-pytest>=8.0.0
-ruff>=0.3.0
+langsmith>=0.1.0

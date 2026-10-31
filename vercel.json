@@ -4,7 +4,12 @@
     "app": {
       "root": ".",
       "runtime": "python",
-      "entrypoint": "api/index.py"
+      "entrypoint": "api/index.py",
+      "functions": {
+        "api/index.py": {
+          "excludeFiles": "{frontend/**,tests/**,__tests__/**,**/*.test.py,**/test_*.py,output/**,.git/**,.venv/**,venv/**}"
+        }
+      }
     },
     "frontend": {
       "root": "frontend",
@@ -28,4 +33,3 @@
     }
   ]
 }
-
