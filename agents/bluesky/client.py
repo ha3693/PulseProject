@@ -101,31 +101,79 @@ class BlueskyClient:
                 logger.warning(f"Authenticated Bluesky search error: {e}")
 
         # 2. Query public XRPC financial & tech publisher streams on Bluesky (100% public HTTP 200)
-        live_posts: List[Dict[str, Any]] = []
-        publisher_actors = ["reuters.com", "bloomberg.com", "cnbc.com", "techcrunch.com"]
+        topic_aliases = {
+            "nvda": ["nvda", "nvidia", "jensen", "blackwell", "ai chip"],
+            "nvidia": ["nvda", "nvidia", "jensen", "blackwell", "ai chip"],
+            "aapl": ["aapl", "apple", "iphone", "tim cook", "macbook"],
+            "apple": ["aapl", "apple", "iphone", "tim cook", "macbook"],
+            "tsla": ["tsla", "tesla", "musk", "cybertruck", "robotaxi"],
+            "tesla": ["tsla", "tesla", "musk", "cybertruck", "robotaxi"],
+            "msft": ["msft", "microsoft", "azure", "copilot", "nadella"],
+            "microsoft": ["msft", "microsoft", "azure", "copilot", "nadella"],
+            "googl": ["googl", "google", "alphabet", "gemini", "waymo"],
+            "google": ["googl", "google", "alphabet", "gemini", "waymo"],
+            "amzn": ["amzn", "amazon", "aws", "jassy"],
+            "amazon": ["amzn", "amazon", "aws", "jassy"],
+            "meta": ["meta", "zuckerberg", "llama", "instagram", "whatsapp"],
+            "amd": ["amd", "lisa su", "instinct", "ryzen", "epyc"],
+            "btc-usd": ["btc", "bitcoin", "crypto", "etf"],
+            "bitcoin": ["btc", "bitcoin", "crypto", "etf"],
+            "gc=f": ["gold", "bullion", "treasury", "fed", "inflation"],
+            "gold": ["gold", "bullion", "treasury", "fed", "inflation"],
+            "cl=f": ["oil", "crude", "opec", "energy", "gas"],
+            "oil": ["oil", "crude", "opec", "energy", "gas"],
+            "nke": ["nike", "sneaker", "retail", "tariffs", "consumer"],
+            "nike": ["nike", "sneaker", "retail", "tariffs", "consumer"],
+            "^gspc": ["s&p", "wall street", "stocks", "nasdaq", "dow", "market"],
+        }
+        q_lower = clean_query.lower().lstrip("$")
+        search_terms = topic_aliases.get(q_lower, [q_lower])
+
+        matched_posts: List[Dict[str, Any]] = []
+        fallback_market_posts: List[Dict[str, Any]] = []
+        publisher_actors = [
+            "cnbc.com",
+            "bloomberg.com",
+            "marketwatch.com",
+            "barrons.com",
+            "techcrunch.com",
+            "reuters.com",
+            "theverge.com",
+            "wired.com",
+        ]
         for actor in publisher_actors:
             try:
-                feed_url = f"{BLUESKY_PUBLIC_API}/app.bsky.feed.getAuthorFeed?actor={actor}&limit=8"
+                feed_url = f"{BLUESKY_PUBLIC_API}/app.bsky.feed.getAuthorFeed?actor={actor}&limit=50"
                 req = urllib.request.Request(feed_url, headers={"User-Agent": "Mozilla/5.0", "Accept": "application/json"})
                 with urllib.request.urlopen(req, timeout=6) as r:
                     if r.status == 200:
                         feed_items = json.loads(r.read().decode("utf-8")).get("feed", [])
                         for item in feed_items:
                             post = item.get("post")
-                            if post:
-                                norm_p = self._normalize_post(post)
-                                if clean_query.lower() in norm_p["content_text"].lower() or len(live_posts) < limit:
-                                    live_posts.append(norm_p)
-                                    if len(live_posts) >= limit:
-                                        break
-                if len(live_posts) >= limit:
+                            if not post:
+                                continue
+                            norm_p = self._normalize_post(post)
+                            text_lower = norm_p["content_text"].lower()
+                            if any(term in text_lower for term in search_terms):
+                                matched_posts.append(norm_p)
+                                if len(matched_posts) >= limit:
+                                    break
+                            elif len(fallback_market_posts) < limit and any(
+                                kw in text_lower for kw in ("stock", "market", "ai", "tech", "earnings", "fed", "tariff")
+                            ):
+                                fallback_market_posts.append(norm_p)
+                if len(matched_posts) >= limit:
                     break
             except Exception:
                 continue
 
+        live_posts = (matched_posts + fallback_market_posts)[:limit]
         if live_posts:
-            logger.info(f"Retrieved {len(live_posts)} live Bluesky posts for '{clean_query}' from public financial feeds")
-            return live_posts[:limit]
+            logger.info(
+                f"Retrieved {len(live_posts)} live Bluesky posts for '{clean_query}' "
+                f"({len(matched_posts)} direct topic matches) from public financial feeds"
+            )
+            return live_posts
 
         # 3. Fallback to representative mock posts
         logger.info(f"Generating representative Bluesky market posts for '{clean_query}'.")
