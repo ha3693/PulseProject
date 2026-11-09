@@ -51,6 +51,15 @@ class StockTwitsClient:
         Returns a list of normalized post dictionaries.
         """
         clean_symbol = symbol.strip().upper().lstrip("$")
+        symbol_aliases = {
+            "GC=F": "GLD",
+            "GOLD": "GLD",
+            "BTC-USD": "BTC.X",
+            "ETH-USD": "ETH.X",
+            "^GSPC": "SPY",
+            "^IXIC": "QQQ",
+        }
+        api_symbol = symbol_aliases.get(clean_symbol, clean_symbol)
 
         if use_mock:
             logger.info(f"Using synthetic/mock data generator for StockTwits symbol '${clean_symbol}'")
@@ -59,7 +68,7 @@ class StockTwitsClient:
         import urllib.request
         import urllib.parse
 
-        url = f"{STOCKTWITS_API_BASE}/streams/symbol/{urllib.parse.quote(clean_symbol)}.json?limit={min(limit, 30)}"
+        url = f"{STOCKTWITS_API_BASE}/streams/symbol/{urllib.parse.quote(api_symbol)}.json?limit={min(limit, 30)}"
 
         try:
             if requests is not None:

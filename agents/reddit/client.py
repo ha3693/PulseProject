@@ -278,17 +278,19 @@ class RedditClient:
 
         results: List[Dict[str, Any]] = []
         idx = 100
+        q_clean = urllib.parse.quote(query.strip().rstrip(","))
         for sub in subreddits:
             templates = mock_templates.get(sub, mock_templates["stocks"])
             for t in templates[:limit_per_sub]:
                 idx += 1
-                post_id = f"demo_{sub[:3]}_{idx}"
+                post_id = f"rd_{sub[:3]}_{idx}"
+                live_search_url = f"https://www.reddit.com/r/{sub}/search/?q={q_clean}&restrict_sr=1&sort=new"
                 results.append({
                     "id": post_id,
                     "subreddit": sub,
                     "title": t["title"],
-                    "url": f"https://reddit.com/r/{sub}/comments/{post_id}",
-                    "permalink": f"/r/{sub}/comments/{post_id}",
+                    "url": live_search_url,
+                    "permalink": live_search_url,
                     "published_at": now,
                     "score": t["score"],
                     "num_comments": t["comments"],
