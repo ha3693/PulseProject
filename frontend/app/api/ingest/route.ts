@@ -65,15 +65,17 @@ export async function POST(request: Request) {
       // Fallback for standalone local development without `vercel dev`
       const projectRoot = path.resolve(process.cwd(), '..')
       const schedulerScript = path.join(projectRoot, 'agents', 'scheduler.py')
+      const venvPython = path.join(projectRoot, '.venv', 'bin', 'python')
+      const pythonBin = fs.existsSync(venvPython) ? venvPython : 'python3'
 
       const args = [schedulerScript, '--trigger', 'web_dashboard']
       if (topic && topic !== 'ALL') {
         args.push('--topic', topic)
       }
 
-      await execFileAsync('python3', args, {
+      await execFileAsync(pythonBin, args, {
         cwd: projectRoot,
-        timeout: 60000,
+        timeout: 180000,
       })
 
       const snapshotPath = path.join(process.cwd(), 'lib', 'data', 'pulse_snapshot.json')
