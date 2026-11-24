@@ -252,7 +252,7 @@ export async function loadPulseTerminalData() {
       if (
         latestReal &&
         latestReal.status === 'running' &&
-        Date.now() - new Date(latestReal.started_at || latestReal.completed_at).getTime() < 10 * 60 * 1000
+        Date.now() - new Date(latestReal.started_at || latestReal.completed_at).getTime() < 4 * 60 * 1000
       ) {
         isRefreshing = true
       }

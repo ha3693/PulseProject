@@ -315,23 +315,37 @@ class PulseIngestionOrchestrator:
         ticker = topic_meta["ticker"]
         slug = topic_meta["slug"]
         live_bars = fetch_live_yahoo_ohlcv(ticker, days=252)
-
-        if not existing_item:
-            # No cached sentiment yet; fall back to full topic run
-            return self.run_for_topic(topic_meta)
+        base_item = existing_item or {}
 
         if not live_bars:
-            return existing_item
+            return base_item if base_item else {
+                "topic": topic_meta,
+                "pulse_index": float(topic_meta.get("sentiment_bias", 0.0)),
+                "finbert_index": float(topic_meta.get("sentiment_bias", 0.0)),
+                "latest_price": float(topic_meta.get("base_price", 0.0)),
+                "price_change": 0.0,
+                "price_change_pct": 0.0,
+                "positive_count": 0,
+                "neutral_count": 0,
+                "negative_count": 0,
+                "total_volume": 0,
+                "divergence_flag": False,
+                "divergence_type": None,
+                "synthesis": f"Live Yahoo Finance price snapshot for {topic_meta['name']} ({ticker}).",
+                "top_drivers": {"agent_scores": {}, "finbert_index": 0.0, "model_agreement_pct": 85.0, "positive_catalysts": [], "risk_factors": [], "top_themes": [], "sector": topic_meta.get("sector", "")},
+                "posts": [],
+                "history": [],
+            }
 
         existing_hist_by_date = {
-            h.get("date"): h for h in existing_item.get("history", []) if h.get("date")
+            h.get("date"): h for h in base_item.get("history", []) if h.get("date")
         }
-        pulse_index = float(existing_item.get("pulse_index", 0.0))
-        finbert_index = float(existing_item.get("finbert_index", 0.0))
-        pos_count = int(existing_item.get("positive_count", 0))
-        neu_count = int(existing_item.get("neutral_count", 0))
-        neg_count = int(existing_item.get("negative_count", 0))
-        total_vol = int(existing_item.get("total_volume", pos_count + neu_count + neg_count))
+        pulse_index = float(base_item.get("pulse_index", topic_meta.get("sentiment_bias", 0.0)))
+        finbert_index = float(base_item.get("finbert_index", pulse_index))
+        pos_count = int(base_item.get("positive_count", 0))
+        neu_count = int(base_item.get("neutral_count", 0))
+        neg_count = int(base_item.get("negative_count", 0))
+        total_vol = int(base_item.get("total_volume", pos_count + neu_count + neg_count))
 
         rng = random.Random(sum(ord(c) for c in slug) + 2026)
         bias = topic_meta["sentiment_bias"]
@@ -402,13 +416,31 @@ class PulseIngestionOrchestrator:
         price_change = round(latest_price - prev_bar["close_price"], 2)
         price_change_pct = round((price_change / prev_bar["close_price"]) * 100.0, 2) if prev_bar["close_price"] > 0 else 0.0
 
-        updated = dict(existing_item)
+        updated = dict(base_item)
         updated.update({
+            "topic": base_item.get("topic") or topic_meta,
+            "pulse_index": pulse_index,
+            "finbert_index": finbert_index,
+            "positive_count": pos_count,
+            "neutral_count": neu_count,
+            "negative_count": neg_count,
+            "total_volume": total_vol,
             "latest_price": latest_price,
             "price_change": price_change,
             "price_change_pct": price_change_pct,
             "divergence_flag": latest_bar["divergence_flag"],
             "divergence_type": latest_bar["divergence_type"],
+            "synthesis": base_item.get("synthesis") or f"Live Yahoo Finance price update for {topic_meta['name']} ({ticker}): ${latest_price} ({price_change_pct:+.2f}%).",
+            "top_drivers": base_item.get("top_drivers") or {
+                "agent_scores": {},
+                "finbert_index": finbert_index,
+                "model_agreement_pct": 85.0,
+                "positive_catalysts": [],
+                "risk_factors": [],
+                "top_themes": [],
+                "sector": topic_meta.get("sector", ""),
+            },
+            "posts": base_item.get("posts", []),
             "history": history,
         })
         return updated
@@ -830,9 +862,9 @@ class PulseIngestionOrchestrator:
             else:
                 total_posts += len(item.get("posts", []))
 
-            # 3. Upsert recent 30-day Historical Daily Sentiment Signals & Asset Prices (full 252-day series stored in snapshot)
+            # 3. Upsert Historical Daily Sentiment Signals & Asset Prices (last 5 days for fast prices_only, 30 days for full)
             drivers_json = _sql_escape(json.dumps(item["top_drivers"]))
-            recent_hist = item["history"][-30:]
+            recent_hist = item["history"][-5:] if prices_only else item["history"][-30:]
             for idx, h in enumerate(recent_hist):
                 total_signals += len(item["history"]) if idx == 0 else 0
                 is_latest = idx == len(recent_hist) - 1
@@ -954,6 +986,38 @@ class PulseIngestionOrchestrator:
                             existing_topics_map[item["topic"]["slug"]] = item
             except Exception:
                 pass
+
+        # On Vercel (where frontend/ is excluded), seed existing sentiment from Supabase if needed
+        if prices_only and not existing_topics_map and sync_db:
+            try:
+                rows = execute_supabase_sql("""
+                SELECT DISTINCT ON (t.slug)
+                    t.slug, d.pulse_index, d.positive_count, d.neutral_count,
+                    d.negative_count, d.total_volume, d.summary_text, d.top_drivers
+                FROM public.daily_sentiment_signals d
+                JOIN public.topics t ON t.id = d.topic_id
+                ORDER BY t.slug, d.signal_date DESC;
+                """)
+                if isinstance(rows, list):
+                    for r in rows:
+                        slug = r.get("slug")
+                        if not slug:
+                            continue
+                        td = r.get("top_drivers") or {}
+                        existing_topics_map[slug] = {
+                            "pulse_index": float(r.get("pulse_index") or 0.0),
+                            "finbert_index": float(td.get("finbert_index") or r.get("pulse_index") or 0.0),
+                            "positive_count": int(r.get("positive_count") or 0),
+                            "neutral_count": int(r.get("neutral_count") or 0),
+                            "negative_count": int(r.get("negative_count") or 0),
+                            "total_volume": int(r.get("total_volume") or 0),
+                            "synthesis": r.get("summary_text") or "",
+                            "top_drivers": td,
+                            "posts": [],
+                            "history": [],
+                        }
+            except Exception as e:
+                logger.warning(f"Could not seed sentiment from Supabase for prices_only: {e}")
 
         run_id = self._start_run_record(
             trigger_source,

@@ -4,7 +4,7 @@ import path from 'path'
 import fs from 'fs'
 import { createClient } from '@/lib/supabase/server'
 
-const TEN_MINUTES_MS = 10 * 60 * 1000
+const TEN_MINUTES_MS = 4 * 60 * 1000
 
 function getPidFilePath() {
   return path.resolve(process.cwd(), '..', 'output', 'ingest_pid.json')
