@@ -95,7 +95,9 @@ export default async function HomePage({
           lastUpdated={snapshot?.generated_at || new Date().toISOString()}
           dataSource={snapshot?.data_source || 'supabase'}
           initialIsRefreshing={isRefreshing}
-          refreshLabel="Refresh All 14 Topics"
+          refreshLabel="Refresh Live Prices (14 Stocks)"
+          refreshTopic="ALL"
+          refreshMode="prices_only"
         />
 
         {/* 1. EXECUTIVE HERO BANNER */}

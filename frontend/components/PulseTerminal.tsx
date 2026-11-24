@@ -397,7 +397,10 @@ export default function PulseTerminal({
       const res = await fetch('/api/ingest', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ topic: targetTopic || 'ALL' }),
+        body: JSON.stringify({
+          topic: targetTopic || 'ALL',
+          mode: targetTopic ? 'full' : 'prices_only',
+        }),
       })
       const data = await res.json()
       if (data?.isRunning) {
@@ -625,7 +628,9 @@ export default function PulseTerminal({
               if (data.snapshot.generated_at) setLastUpdated(data.snapshot.generated_at)
             }
           }}
-          refreshLabel={currentAsset ? `Refresh ${currentAsset.topic.ticker} Now` : 'Refresh Data Now'}
+          refreshLabel={currentAsset ? `Refresh ${currentAsset.topic.ticker} News & Social` : 'Refresh Live Prices'}
+          refreshTopic={currentAsset?.topic?.ticker || 'ALL'}
+          refreshMode={currentAsset ? 'full' : 'prices_only'}
         />
 
         {/* ===================================================================

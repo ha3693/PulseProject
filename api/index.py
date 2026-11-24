@@ -60,6 +60,8 @@ class handler(BaseHTTPRequestHandler):
         topic = body.get("topic")
         if topic and str(topic).strip().upper() == "ALL":
             topic = None
+        mode = body.get("mode") or ("prices_only" if not topic else "full")
+        prices_only = str(mode).strip().lower() == "prices_only"
         trigger = body.get("trigger", "vercel_service_binding")
 
         try:
@@ -68,6 +70,7 @@ class handler(BaseHTTPRequestHandler):
                 topic_filter=topic,
                 trigger_source=trigger,
                 sync_db=True,
+                prices_only=prices_only,
             )
             self._send_json(
                 200,

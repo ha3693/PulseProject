@@ -11,6 +11,8 @@ interface DataFreshnessBannerProps {
   onRefresh?: () => Promise<void> | void
   onRefreshComplete?: (payload?: any) => void
   refreshLabel?: string
+  refreshTopic?: string
+  refreshMode?: 'prices_only' | 'full'
 }
 
 const ONE_HOUR_MS = 60 * 60 * 1000
@@ -47,6 +49,8 @@ export default function DataFreshnessBanner({
   onRefresh,
   onRefreshComplete,
   refreshLabel = 'Refresh Data Now',
+  refreshTopic = 'ALL',
+  refreshMode = 'prices_only',
 }: DataFreshnessBannerProps) {
   const router = useRouter()
   const [nowMs, setNowMs] = useState<number>(() => Date.now())
@@ -185,7 +189,7 @@ export default function DataFreshnessBanner({
       const res = await fetch('/api/ingest', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ topic: 'ALL' }),
+        body: JSON.stringify({ topic: refreshTopic, mode: refreshMode }),
       })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))

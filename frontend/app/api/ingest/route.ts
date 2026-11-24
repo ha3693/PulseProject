@@ -95,6 +95,13 @@ export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => ({}))
     const topic = body?.topic ? String(body.topic).trim() : null
+    const isAll = !topic || topic.toUpperCase() === 'ALL'
+    const mode: 'prices_only' | 'full' =
+      body?.mode === 'full' || body?.mode === 'prices_only'
+        ? body.mode
+        : isAll
+        ? 'prices_only'
+        : 'full'
 
     const localState = isLocalProcessRunning()
     if (localState.running) {
@@ -139,6 +146,7 @@ export async function POST(request: Request) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           topic: topic || 'ALL',
+          mode,
           trigger: 'web_dashboard',
         }),
       })
@@ -175,8 +183,11 @@ export async function POST(request: Request) {
     const logFd = fs.openSync(path.join(outputDir, 'ingest_live.log'), 'a')
 
     const args = [schedulerScript, '--trigger', 'web_dashboard']
-    if (topic && topic !== 'ALL') {
+    if (topic && topic.toUpperCase() !== 'ALL') {
       args.push('--topic', topic)
+    }
+    if (mode === 'prices_only') {
+      args.push('--prices-only')
     }
 
     const child = spawn(pythonBin, args, {
