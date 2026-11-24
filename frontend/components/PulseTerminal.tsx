@@ -3,6 +3,7 @@
 import React, { useState, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import benchmarkData from '@/lib/data/benchmark_200.json'
+import DataFreshnessBanner from '@/components/DataFreshnessBanner'
 
 export interface HistoryPoint {
   date: string
@@ -104,6 +105,7 @@ interface PulseTerminalProps {
   initialSnapshot: {
     generated_at: string
     schedule_cron: string
+    data_source?: string
     assets: AssetSignal[]
     social_radar: SocialRadarItem[]
   }
@@ -558,7 +560,14 @@ export default function PulseTerminal({
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-              Synced: {new Date(lastUpdated).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              Data last updated on:{' '}
+              {new Date(lastUpdated).toLocaleString(undefined, {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+              })}
             </span>
             <button
               onClick={() => handleTriggerIngestion(currentAsset.topic.ticker)}
@@ -570,6 +579,14 @@ export default function PulseTerminal({
             </button>
           </div>
         </div>
+
+        <DataFreshnessBanner
+          lastUpdated={lastUpdated}
+          dataSource={initialSnapshot?.data_source || 'supabase'}
+          isRefreshing={isIngesting}
+          onRefresh={() => handleTriggerIngestion(currentAsset?.topic?.ticker)}
+          refreshLabel={currentAsset ? `Refresh ${currentAsset.topic.ticker} Now` : 'Refresh Data Now'}
+        />
 
         {/* ===================================================================
             TAB 1: MARKET LENS

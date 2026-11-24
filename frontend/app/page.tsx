@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { loadPulseTerminalData } from '@/lib/data/loadPulseData'
 import { AssetSignal } from '@/components/PulseTerminal'
+import DataFreshnessBanner from '@/components/DataFreshnessBanner'
 
 export const dynamic = 'force-dynamic'
 
@@ -89,7 +90,13 @@ export default async function HomePage({
         </div>
       </div>
 
-      <div className="container" style={{ paddingTop: '2.75rem', paddingBottom: '4.5rem' }}>
+      <div className="container" style={{ paddingTop: '1.75rem', paddingBottom: '4.5rem' }}>
+        <DataFreshnessBanner
+          lastUpdated={snapshot?.generated_at || new Date().toISOString()}
+          dataSource={snapshot?.data_source || 'supabase'}
+          refreshLabel="Refresh All 14 Topics"
+        />
+
         {/* 1. EXECUTIVE HERO BANNER */}
         <div
           className="card"
