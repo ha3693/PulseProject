@@ -626,11 +626,54 @@ class PulseIngestionOrchestrator:
             },
         ]
 
+    def _start_run_record(self, trigger_source: str, topic_filter: Optional[str]) -> Optional[str]:
+        """Insert a 'running' row in scheduled_ingestion_runs so all clients see the active refresh."""
+        note = f"Live refresh in progress ({topic_filter.upper() if topic_filter else 'ALL 14 Topics'})..."
+        sql = f"""
+        INSERT INTO public.scheduled_ingestion_runs (
+            trigger_source, status, topics_processed, posts_ingested, signals_updated,
+            agents_invoked, duration_ms, summary_notes, started_at, completed_at
+        ) VALUES (
+            {_sql_escape(trigger_source)},
+            'running',
+            0, 0, 0,
+            ARRAY['yahoo', 'reddit', 'stocktwits', 'bluesky', 'gdelt'],
+            0,
+            {_sql_escape(note)},
+            NOW(),
+            NOW()
+        )
+        RETURNING id::text;
+        """
+        try:
+            res = execute_supabase_sql(sql)
+            if isinstance(res, list) and res and isinstance(res[0], dict):
+                return res[0].get("id")
+        except Exception as e:
+            logger.warning(f"Could not insert running status in Supabase: {e}")
+        return None
+
+    def _fail_run_record(self, run_id: Optional[str], error_msg: str) -> None:
+        if not run_id:
+            return
+        sql = f"""
+        UPDATE public.scheduled_ingestion_runs
+        SET status = 'failed',
+            summary_notes = {_sql_escape(f'Refresh failed: {error_msg[:300]}')},
+            completed_at = NOW()
+        WHERE id = {_sql_escape(run_id)}::uuid;
+        """
+        try:
+            execute_supabase_sql(sql)
+        except Exception:
+            pass
+
     def sync_to_supabase(
         self,
         results: List[Dict[str, Any]],
         trigger_source: str = "scheduled_cron",
         duration_ms: int = 1250,
+        run_id: Optional[str] = None,
     ) -> bool:
         """Persist topics, raw_content, sentiment_items, recent daily signals, and prices to Supabase."""
         logger.info("🗄️ Syncing multi-agent ingestion batch to Supabase PostgreSQL...")
@@ -722,25 +765,38 @@ class PulseIngestionOrchestrator:
                     daily_return = EXCLUDED.daily_return;
                 """)
 
-        # 4. Record Scheduled Ingestion Run Audit Entry
+        # 4. Record or Update Scheduled Ingestion Run Audit Entry
         notes = f"Ingested {len(results)} topics, {total_posts} multi-agent posts, and {total_signals} historical daily signal/price bars."
-        statements.append(f"""
-        INSERT INTO public.scheduled_ingestion_runs (
-            trigger_source, status, topics_processed, posts_ingested, signals_updated,
-            agents_invoked, duration_ms, summary_notes, started_at, completed_at
-        ) VALUES (
-            {_sql_escape(trigger_source)},
-            'completed',
-            {len(results)},
-            {total_posts},
-            {total_signals},
-            ARRAY['yahoo', 'reddit', 'stocktwits', 'bluesky', 'gdelt'],
-            {int(duration_ms)},
-            {_sql_escape(notes)},
-            NOW() - INTERVAL '{int(duration_ms)} milliseconds',
-            NOW()
-        );
-        """)
+        if run_id:
+            statements.append(f"""
+            UPDATE public.scheduled_ingestion_runs
+            SET status = 'completed',
+                topics_processed = {len(results)},
+                posts_ingested = {total_posts},
+                signals_updated = {total_signals},
+                duration_ms = {int(duration_ms)},
+                summary_notes = {_sql_escape(notes)},
+                completed_at = NOW()
+            WHERE id = {_sql_escape(run_id)}::uuid;
+            """)
+        else:
+            statements.append(f"""
+            INSERT INTO public.scheduled_ingestion_runs (
+                trigger_source, status, topics_processed, posts_ingested, signals_updated,
+                agents_invoked, duration_ms, summary_notes, started_at, completed_at
+            ) VALUES (
+                {_sql_escape(trigger_source)},
+                'completed',
+                {len(results)},
+                {total_posts},
+                {total_signals},
+                ARRAY['yahoo', 'reddit', 'stocktwits', 'bluesky', 'gdelt'],
+                {int(duration_ms)},
+                {_sql_escape(notes)},
+                NOW() - INTERVAL '{int(duration_ms)} milliseconds',
+                NOW()
+            );
+            """)
 
         statements.append("COMMIT;")
         full_sql = "\n".join(statements)
@@ -771,13 +827,23 @@ class PulseIngestionOrchestrator:
             if filtered:
                 selected_topics = filtered
 
-        results = [self.run_for_topic(t) for t in selected_topics]
-        social_radar = self.run_social_radar()
-        duration_ms = int((time.time() - t0) * 1000)
+        run_id = self._start_run_record(trigger_source, topic_filter) if sync_db else None
+        try:
+            results = [self.run_for_topic(t) for t in selected_topics]
+            social_radar = self.run_social_radar()
+            duration_ms = int((time.time() - t0) * 1000)
 
-        db_synced = False
-        if sync_db:
-            db_synced = self.sync_to_supabase(results, trigger_source=trigger_source, duration_ms=duration_ms)
+            db_synced = False
+            if sync_db:
+                db_synced = self.sync_to_supabase(
+                    results,
+                    trigger_source=trigger_source,
+                    duration_ms=duration_ms,
+                    run_id=run_id,
+                )
+        except Exception as exc:
+            self._fail_run_record(run_id, str(exc))
+            raise
 
         # Save JSON snapshot for Next.js frontend
         snapshot_dir = ROOT_DIR / "frontend" / "lib" / "data"

@@ -15,7 +15,7 @@ export default async function HomePage({
     redirect(`/auth/callback?code=${encodeURIComponent(searchParams.code)}`)
   }
 
-  const { snapshot, user } = await loadPulseTerminalData()
+  const { snapshot, isRefreshing, user } = await loadPulseTerminalData()
   const assets: AssetSignal[] = snapshot?.assets || []
 
   const sortedByBullish = [...assets].sort((a, b) => b.pulse_index - a.pulse_index)
@@ -94,6 +94,7 @@ export default async function HomePage({
         <DataFreshnessBanner
           lastUpdated={snapshot?.generated_at || new Date().toISOString()}
           dataSource={snapshot?.data_source || 'supabase'}
+          initialIsRefreshing={isRefreshing}
           refreshLabel="Refresh All 14 Topics"
         />
 

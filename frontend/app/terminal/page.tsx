@@ -8,7 +8,7 @@ export default async function TerminalPage({
 }: {
   searchParams?: { asset?: string; tab?: 'market' | 'brand' | 'backtest' | 'social' | 'pipeline' }
 }) {
-  const { snapshot, runs, watchlistSlugs, user } = await loadPulseTerminalData()
+  const { snapshot, runs, isRefreshing, watchlistSlugs, user } = await loadPulseTerminalData()
 
   const validTabs = ['market', 'brand', 'backtest', 'social', 'pipeline']
   const initialTab =
@@ -20,6 +20,7 @@ export default async function TerminalPage({
       <PulseTerminal
         initialSnapshot={snapshot}
         initialRuns={runs}
+        initialIsRefreshing={isRefreshing}
         initialWatchlistSlugs={watchlistSlugs}
         userEmail={user?.email || null}
         initialTab={initialTab}

@@ -110,6 +110,7 @@ interface PulseTerminalProps {
     social_radar: SocialRadarItem[]
   }
   initialRuns: IngestionRunLog[]
+  initialIsRefreshing?: boolean
   initialWatchlistSlugs: string[]
   userEmail?: string | null
   initialTab?: 'market' | 'brand' | 'backtest' | 'social' | 'pipeline'
@@ -127,6 +128,7 @@ const AGENT_META: Record<string, { label: string; weight: string; color: string;
 export default function PulseTerminal({
   initialSnapshot,
   initialRuns,
+  initialIsRefreshing = false,
   initialWatchlistSlugs,
   userEmail,
   initialTab = 'market',
@@ -165,8 +167,22 @@ export default function PulseTerminal({
   const router = useRouter()
   const [watchlist, setWatchlist] = useState<string[]>(initialWatchlistSlugs || ['nvda', 'aapl', 'btc-usd', 'nike'])
   const [watchlistToast, setWatchlistToast] = useState<string | null>(null)
-  const [isIngesting, setIsIngesting] = useState<boolean>(false)
+  const [isIngesting, setIsIngesting] = useState<boolean>(initialIsRefreshing)
   const [ingestStatusMsg, setIngestStatusMsg] = useState<string | null>(null)
+
+  useEffect(() => {
+    setAssets(initialSnapshot?.assets || [])
+    if (initialSnapshot?.social_radar) setSocialRadar(initialSnapshot.social_radar)
+    if (initialSnapshot?.generated_at) setLastUpdated(initialSnapshot.generated_at)
+  }, [initialSnapshot])
+
+  useEffect(() => {
+    setRuns(initialRuns || [])
+  }, [initialRuns])
+
+  useEffect(() => {
+    if (initialIsRefreshing) setIsIngesting(true)
+  }, [initialIsRefreshing])
 
   useEffect(() => {
     if (initialWatchlistSlugs) {
@@ -364,10 +380,18 @@ export default function PulseTerminal({
 
   async function handleTriggerIngestion(targetTopic?: string) {
     setIsIngesting(true)
+    try {
+      sessionStorage.setItem(
+        'pulse_refresh_in_progress',
+        JSON.stringify({ startedAt: Date.now(), target: targetTopic || 'ALL' })
+      )
+    } catch {
+      // Ignore
+    }
     setIngestStatusMsg(
       targetTopic
-        ? `Executing Yahoo, Reddit, StockTwits, Bluesky & GDELT agents for ${targetTopic.toUpperCase()}...`
-        : 'Executing full multi-agent scheduled ingestion across all 14 topics & syncing to Supabase...'
+        ? `Running Yahoo, Reddit, StockTwits, Bluesky & GDELT agents for ${targetTopic.toUpperCase()} in the background...`
+        : 'Running full multi-agent scheduled ingestion across all 14 topics & syncing to Supabase...'
     )
     try {
       const res = await fetch('/api/ingest', {
@@ -376,6 +400,10 @@ export default function PulseTerminal({
         body: JSON.stringify({ topic: targetTopic || 'ALL' }),
       })
       const data = await res.json()
+      if (data?.isRunning) {
+        // Background job is running; DataFreshnessBanner polling will complete & refresh
+        return
+      }
       if (data?.snapshot?.assets && Array.isArray(data.snapshot.assets)) {
         const incoming = data.snapshot.assets as AssetSignal[]
         if (incoming.length >= assets.length) {
@@ -390,13 +418,14 @@ export default function PulseTerminal({
       if (data?.runs) {
         setRuns(data.runs)
       }
+      setIsIngesting(false)
       setIngestStatusMsg(
         `✅ Live ingestion complete for ${data.topic || 'all assets'} — synced to Supabase PostgreSQL!`
       )
+      setTimeout(() => setIngestStatusMsg(null), 5000)
     } catch (e: any) {
-      setIngestStatusMsg(`⚠️ Ingestion notice: ${e?.message || 'Completed using cached snapshot'}`)
-    } finally {
       setIsIngesting(false)
+      setIngestStatusMsg(`⚠️ Ingestion notice: ${e?.message || 'Completed using cached snapshot'}`)
       setTimeout(() => setIngestStatusMsg(null), 5000)
     }
   }
@@ -583,8 +612,19 @@ export default function PulseTerminal({
         <DataFreshnessBanner
           lastUpdated={lastUpdated}
           dataSource={initialSnapshot?.data_source || 'supabase'}
+          initialIsRefreshing={initialIsRefreshing}
           isRefreshing={isIngesting}
           onRefresh={() => handleTriggerIngestion(currentAsset?.topic?.ticker)}
+          onRefreshComplete={(data) => {
+            setIsIngesting(false)
+            setIngestStatusMsg(null)
+            if (data?.runs) setRuns(data.runs)
+            if (data?.snapshot?.assets && Array.isArray(data.snapshot.assets)) {
+              setAssets(data.snapshot.assets)
+              if (data.snapshot.social_radar) setSocialRadar(data.snapshot.social_radar)
+              if (data.snapshot.generated_at) setLastUpdated(data.snapshot.generated_at)
+            }
+          }}
           refreshLabel={currentAsset ? `Refresh ${currentAsset.topic.ticker} Now` : 'Refresh Data Now'}
         />
 

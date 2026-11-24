@@ -6,12 +6,16 @@ import { useRouter } from 'next/navigation'
 interface DataFreshnessBannerProps {
   lastUpdated: string
   dataSource?: 'supabase' | 'snapshot_fallback' | string
+  initialIsRefreshing?: boolean
   isRefreshing?: boolean
   onRefresh?: () => Promise<void> | void
+  onRefreshComplete?: (payload?: any) => void
   refreshLabel?: string
 }
 
 const ONE_HOUR_MS = 60 * 60 * 1000
+const REFRESH_STORAGE_KEY = 'pulse_refresh_in_progress'
+const DISMISS_STORAGE_KEY = 'pulse_dismissed_ts'
 
 function formatDateTime(iso: string): string {
   const dt = new Date(iso)
@@ -38,34 +42,138 @@ function formatAgeLabel(ageMs: number): string {
 export default function DataFreshnessBanner({
   lastUpdated,
   dataSource = 'supabase',
+  initialIsRefreshing = false,
   isRefreshing: externalRefreshing,
   onRefresh,
+  onRefreshComplete,
   refreshLabel = 'Refresh Data Now',
 }: DataFreshnessBannerProps) {
   const router = useRouter()
   const [nowMs, setNowMs] = useState<number>(() => Date.now())
   const [dismissedForTimestamp, setDismissedForTimestamp] = useState<string | null>(null)
-  const [internalRefreshing, setInternalRefreshing] = useState<boolean>(false)
+  const [internalRefreshing, setInternalRefreshing] = useState<boolean>(initialIsRefreshing)
+  const [justCompletedMsg, setJustCompletedMsg] = useState<string | null>(null)
   const [refreshError, setRefreshError] = useState<string | null>(null)
+
+  // Restore cross-page session state on mount
+  useEffect(() => {
+    try {
+      const savedDismissed = sessionStorage.getItem(DISMISS_STORAGE_KEY)
+      if (savedDismissed) setDismissedForTimestamp(savedDismissed)
+
+      const savedRefresh = sessionStorage.getItem(REFRESH_STORAGE_KEY)
+      if (savedRefresh) {
+        const parsed = JSON.parse(savedRefresh)
+        if (parsed?.startedAt && Date.now() - parsed.startedAt < 10 * 60 * 1000) {
+          setInternalRefreshing(true)
+        } else {
+          sessionStorage.removeItem(REFRESH_STORAGE_KEY)
+        }
+      }
+    } catch {
+      // Ignore storage errors
+    }
+  }, [])
+
+  useEffect(() => {
+    if (initialIsRefreshing) {
+      setInternalRefreshing(true)
+    }
+  }, [initialIsRefreshing])
 
   useEffect(() => {
     const timer = setInterval(() => setNowMs(Date.now()), 30_000)
     return () => clearInterval(timer)
   }, [])
 
+  const refreshing = Boolean(externalRefreshing || internalRefreshing)
+
+  // Poll GET /api/ingest while a refresh is in progress so navigating across pages stays in sync
+  useEffect(() => {
+    if (!refreshing) return
+    let active = true
+
+    const pollStatus = async () => {
+      try {
+        const res = await fetch('/api/ingest', { cache: 'no-store' })
+        if (!res.ok || !active) return
+        const data = await res.json()
+
+        // Wait until backend reports no active running job
+        if (data?.isRunning === false) {
+          let startedAt = 0
+          try {
+            const raw = sessionStorage.getItem(REFRESH_STORAGE_KEY)
+            startedAt = raw ? JSON.parse(raw)?.startedAt || 0 : 0
+          } catch {
+            startedAt = 0
+          }
+
+          const latestTs = data?.latestCompletedAt ? new Date(data.latestCompletedAt).getTime() : 0
+          // Only finish if a new completed run arrived OR enough time passed for DB/snapshot update
+          if (!startedAt || latestTs > startedAt - 5000 || Date.now() - startedAt > 8000) {
+            try {
+              sessionStorage.removeItem(REFRESH_STORAGE_KEY)
+              sessionStorage.removeItem(DISMISS_STORAGE_KEY)
+            } catch {
+              // Ignore
+            }
+            if (!active) return
+            setInternalRefreshing(false)
+            setJustCompletedMsg('Fresh market & sentiment data saved to database. Updating view...')
+            if (onRefreshComplete) {
+              onRefreshComplete(data)
+            }
+            router.refresh()
+            setTimeout(() => {
+              if (active) setJustCompletedMsg(null)
+            }, 5000)
+          }
+        }
+      } catch {
+        // Keep polling on transient error
+      }
+    }
+
+    const interval = setInterval(pollStatus, 4000)
+    return () => {
+      active = false
+      clearInterval(interval)
+    }
+  }, [refreshing, onRefreshComplete, router])
+
   const parsedMs = new Date(lastUpdated).getTime()
   const ageMs = Number.isNaN(parsedMs) ? 0 : Math.max(0, nowMs - parsedMs)
   const isStale = ageMs > ONE_HOUR_MS
   const isAccepted = dismissedForTimestamp === lastUpdated
-  const refreshing = externalRefreshing ?? internalRefreshing
+
+  function handleAcceptCurrent() {
+    setDismissedForTimestamp(lastUpdated)
+    try {
+      sessionStorage.setItem(DISMISS_STORAGE_KEY, lastUpdated)
+    } catch {
+      // Ignore
+    }
+  }
 
   async function handleRefreshClick() {
     setRefreshError(null)
+    setJustCompletedMsg(null)
+    try {
+      sessionStorage.setItem(
+        REFRESH_STORAGE_KEY,
+        JSON.stringify({ startedAt: Date.now(), target: refreshLabel })
+      )
+    } catch {
+      // Ignore
+    }
+    setInternalRefreshing(true)
+
     if (onRefresh) {
       await onRefresh()
       return
     }
-    setInternalRefreshing(true)
+
     try {
       const res = await fetch('/api/ingest', {
         method: 'POST',
@@ -76,11 +184,26 @@ export default function DataFreshnessBanner({
         const err = await res.json().catch(() => ({}))
         throw new Error(err?.message || `Refresh failed (${res.status})`)
       }
-      router.refresh()
+      const data = await res.json()
+      if (data?.status === 'completed' && !data?.isRunning) {
+        try {
+          sessionStorage.removeItem(REFRESH_STORAGE_KEY)
+          sessionStorage.removeItem(DISMISS_STORAGE_KEY)
+        } catch {
+          // Ignore
+        }
+        setInternalRefreshing(false)
+        setJustCompletedMsg('Fresh data saved to database!')
+        router.refresh()
+      }
     } catch (err: any) {
-      setRefreshError(err?.message || 'Unable to refresh data right now.')
-    } finally {
+      try {
+        sessionStorage.removeItem(REFRESH_STORAGE_KEY)
+      } catch {
+        // Ignore
+      }
       setInternalRefreshing(false)
+      setRefreshError(err?.message || 'Unable to refresh data right now.')
     }
   }
 
@@ -107,7 +230,7 @@ export default function DataFreshnessBanner({
               width: '8px',
               height: '8px',
               borderRadius: '999px',
-              backgroundColor: isStale ? '#f59e0b' : '#10b981',
+              backgroundColor: refreshing ? '#38bdf8' : isStale ? '#f59e0b' : '#10b981',
               display: 'inline-block',
             }}
           />
@@ -144,8 +267,67 @@ export default function DataFreshnessBanner({
         </span>
       </div>
 
+      {/* Persistent Cross-Page "Refresh in Progress" Banner */}
+      {refreshing && (
+        <div
+          role="status"
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: '0.75rem',
+            padding: '0.85rem 1.15rem',
+            borderRadius: '10px',
+            background: 'linear-gradient(90deg, rgba(6, 182, 212, 0.18), rgba(15, 23, 42, 0.94))',
+            border: '1px solid rgba(56, 189, 248, 0.45)',
+          }}
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+            <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#7dd3fc' }}>
+              ⏳ Data Refresh in Progress
+            </div>
+            <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+              Our AI agents are gathering fresh market prices, news, and social sentiment and saving
+              them to the shared database. You can switch pages freely—the app will update
+              automatically as soon as it finishes.
+            </div>
+          </div>
+          <span
+            className="terminal-badge"
+            style={{
+              padding: '0.3rem 0.7rem',
+              fontSize: '0.75rem',
+              backgroundColor: 'rgba(56, 189, 248, 0.16)',
+              color: '#38bdf8',
+              fontFamily: 'var(--font-mono)',
+            }}
+          >
+            SYNCING TO SUPABASE...
+          </span>
+        </div>
+      )}
+
+      {/* Completion Confirmation Banner */}
+      {justCompletedMsg && !refreshing && (
+        <div
+          role="status"
+          style={{
+            padding: '0.75rem 1.1rem',
+            borderRadius: '10px',
+            background: 'rgba(16, 185, 129, 0.15)',
+            border: '1px solid rgba(16, 185, 129, 0.45)',
+            color: '#6ee7b7',
+            fontSize: '0.85rem',
+            fontWeight: 600,
+          }}
+        >
+          ✅ {justCompletedMsg}
+        </div>
+      )}
+
       {/* > 1 Hour Staleness Notification Banner */}
-      {isStale && !isAccepted && (
+      {!refreshing && !justCompletedMsg && isStale && !isAccepted && (
         <div
           role="status"
           style={{
@@ -166,8 +348,8 @@ export default function DataFreshnessBanner({
             </div>
             <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
               Current market &amp; sentiment signals were last updated on{' '}
-              <strong style={{ color: '#f8fafc' }}>{formatDateTime(lastUpdated)}</strong>. You can
-              trigger a fresh multi-agent scan or keep viewing the current dataset.
+              <strong style={{ color: '#f8fafc' }}>{formatDateTime(lastUpdated)}</strong>. Refreshing
+              will update the shared database for all users, or you can keep viewing the current data.
             </div>
             {refreshError && (
               <div style={{ fontSize: '0.78rem', color: '#fb7185', marginTop: '0.2rem' }}>
@@ -180,16 +362,14 @@ export default function DataFreshnessBanner({
             <button
               type="button"
               onClick={handleRefreshClick}
-              disabled={refreshing}
               className="btn btn-primary"
               style={{ padding: '0.45rem 0.95rem', fontSize: '0.8rem' }}
             >
-              {refreshing ? '⏳ Refreshing...' : `🔄 ${refreshLabel}`}
+              🔄 {refreshLabel}
             </button>
             <button
               type="button"
-              onClick={() => setDismissedForTimestamp(lastUpdated)}
-              disabled={refreshing}
+              onClick={handleAcceptCurrent}
               className="btn btn-outline"
               style={{ padding: '0.45rem 0.85rem', fontSize: '0.8rem' }}
             >

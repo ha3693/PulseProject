@@ -202,6 +202,7 @@ export async function loadPulseTerminalData() {
   let snapshot = fallbackSnapshot
   let user: any = null
   let runs: any[] = []
+  let isRefreshing = false
   let watchlistItems: Array<{ slug: string; notes: string }> = [...DEFAULT_WATCHLIST_ITEMS]
   let watchlistSlugs: string[] = DEFAULT_WATCHLIST_ITEMS.map((i) => i.slug)
 
@@ -220,7 +221,7 @@ export async function loadPulseTerminalData() {
       supabase
         .from('scheduled_ingestion_runs')
         .select('*')
-        .order('completed_at', { ascending: false })
+        .order('started_at', { ascending: false })
         .limit(15),
       supabase
         .from('topics')
@@ -245,6 +246,16 @@ export async function loadPulseTerminalData() {
     const runRows = runsRes?.data || []
     if (runRows.length > 0) {
       runs = runRows
+      const latestReal = runRows.find(
+        (r: any) => !Array.isArray(r?.agents_invoked) || !r.agents_invoked.includes('pg_cron_rollup')
+      )
+      if (
+        latestReal &&
+        latestReal.status === 'running' &&
+        Date.now() - new Date(latestReal.started_at || latestReal.completed_at).getTime() < 10 * 60 * 1000
+      ) {
+        isRefreshing = true
+      }
     }
 
     const topicRows = topicsRes?.data || []
@@ -319,6 +330,7 @@ export async function loadPulseTerminalData() {
   return {
     snapshot,
     runs,
+    isRefreshing,
     watchlistSlugs,
     watchlistItems,
     user,
