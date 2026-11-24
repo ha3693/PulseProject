@@ -6,6 +6,34 @@ import { createClient } from '@/lib/supabase/server'
 
 const TEN_MINUTES_MS = 10 * 60 * 1000
 
+function getPidFilePath() {
+  return path.resolve(process.cwd(), '..', 'output', 'ingest_pid.json')
+}
+
+function isLocalProcessRunning(): { running: boolean; startedAt?: number; topic?: string } {
+  const pidPath = getPidFilePath()
+  if (!fs.existsSync(pidPath)) return { running: false }
+  try {
+    const info = JSON.parse(fs.readFileSync(pidPath, 'utf-8'))
+    const pid = Number(info?.pid)
+    const startedAt = Number(info?.startedAt || 0)
+    if (!pid || Date.now() - startedAt > TEN_MINUTES_MS) {
+      fs.unlinkSync(pidPath)
+      return { running: false }
+    }
+    // Signal 0 checks if the OS process is still alive without killing it
+    process.kill(pid, 0)
+    return { running: true, startedAt, topic: info?.topic }
+  } catch {
+    try {
+      fs.unlinkSync(pidPath)
+    } catch {
+      // Ignore
+    }
+    return { running: false }
+  }
+}
+
 function detectActiveRun(runs: any[]): { isRunning: boolean; activeRun: any | null; latestCompletedAt: string | null } {
   const realRuns = (runs || []).filter(
     (r: any) => !Array.isArray(r?.agents_invoked) || !r.agents_invoked.includes('pg_cron_rollup')
@@ -41,13 +69,17 @@ export async function GET() {
       snapshot = JSON.parse(fs.readFileSync(snapshotPath, 'utf-8'))
     }
 
-    const { isRunning, activeRun, latestCompletedAt } = detectActiveRun(runs || [])
+    const dbState = detectActiveRun(runs || [])
+    const localState = isLocalProcessRunning()
+    const isRunning = dbState.isRunning || localState.running
 
     return NextResponse.json({
       status: 'ok',
       isRunning,
-      activeRun,
-      latestCompletedAt: latestCompletedAt || snapshot?.generated_at || null,
+      activeRun: dbState.activeRun || (localState.running ? localState : null),
+      latestCompletedAt: dbState.latestCompletedAt || snapshot?.generated_at || null,
+      snapshotGeneratedAt: snapshot?.generated_at || null,
+      dbSynced: snapshot?.db_synced ?? null,
       runs: runs || [],
       snapshot,
     })
@@ -63,6 +95,20 @@ export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => ({}))
     const topic = body?.topic ? String(body.topic).trim() : null
+
+    const localState = isLocalProcessRunning()
+    if (localState.running) {
+      return NextResponse.json(
+        {
+          status: 'already_running',
+          isRunning: true,
+          activeRun: localState,
+          topic: topic || 'ALL (14 Topics)',
+          message: 'A live data refresh is already in progress.',
+        },
+        { status: 202 }
+      )
+    }
 
     const supabase = await createClient()
     const { data: existingRuns } = await supabase
@@ -88,7 +134,6 @@ export async function POST(request: Request) {
     const agentServiceUrl = process.env.AGENT_SERVICE_URL
 
     if (agentServiceUrl) {
-      // Call the internal Python `app` service via the Vercel Service Binding URL
       const response = await fetch(new URL('/ingest', agentServiceUrl), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -119,11 +164,15 @@ export async function POST(request: Request) {
       })
     }
 
-    // Local / VM deployment: launch detached background process so navigating away does not abort it
+    // Local / VM deployment: launch detached background process & track its PID
     const projectRoot = path.resolve(process.cwd(), '..')
     const schedulerScript = path.join(projectRoot, 'agents', 'scheduler.py')
     const venvPython = path.join(projectRoot, '.venv', 'bin', 'python')
     const pythonBin = fs.existsSync(venvPython) ? venvPython : 'python3'
+
+    const outputDir = path.join(projectRoot, 'output')
+    fs.mkdirSync(outputDir, { recursive: true })
+    const logFd = fs.openSync(path.join(outputDir, 'ingest_live.log'), 'a')
 
     const args = [schedulerScript, '--trigger', 'web_dashboard']
     if (topic && topic !== 'ALL') {
@@ -133,16 +182,22 @@ export async function POST(request: Request) {
     const child = spawn(pythonBin, args, {
       cwd: projectRoot,
       detached: true,
-      stdio: 'ignore',
+      stdio: ['ignore', logFd, logFd],
     })
     child.unref()
+
+    fs.writeFileSync(
+      getPidFilePath(),
+      JSON.stringify({ pid: child.pid, startedAt: Date.now(), topic: topic || 'ALL' }),
+      'utf-8'
+    )
 
     return NextResponse.json(
       {
         status: 'started',
         isRunning: true,
         topic: topic || 'ALL (14 Topics)',
-        message: 'Background multi-agent refresh started and will sync to Supabase.',
+        message: 'Background multi-agent refresh started.',
       },
       { status: 202 }
     )

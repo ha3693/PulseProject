@@ -109,9 +109,12 @@ export default function DataFreshnessBanner({
             startedAt = 0
           }
 
-          const latestTs = data?.latestCompletedAt ? new Date(data.latestCompletedAt).getTime() : 0
-          // Only finish if a new completed run arrived OR enough time passed for DB/snapshot update
-          if (!startedAt || latestTs > startedAt - 5000 || Date.now() - startedAt > 8000) {
+          const latestTs = Math.max(
+            data?.latestCompletedAt ? new Date(data.latestCompletedAt).getTime() : 0,
+            data?.snapshotGeneratedAt ? new Date(data.snapshotGeneratedAt).getTime() : 0
+          )
+          // Finish only when a new completed run/snapshot arrived (or no startedAt tracked)
+          if (!startedAt || latestTs > startedAt - 5000) {
             try {
               sessionStorage.removeItem(REFRESH_STORAGE_KEY)
               sessionStorage.removeItem(DISMISS_STORAGE_KEY)
@@ -120,14 +123,18 @@ export default function DataFreshnessBanner({
             }
             if (!active) return
             setInternalRefreshing(false)
-            setJustCompletedMsg('Fresh market & sentiment data saved to database. Updating view...')
+            setJustCompletedMsg(
+              data?.dbSynced === false
+                ? 'Refresh finished (saved to local snapshot; check SUPABASE_ACCESS_TOKEN in .env to sync DB).'
+                : 'Fresh market & sentiment data saved to database. Updating view...'
+            )
             if (onRefreshComplete) {
               onRefreshComplete(data)
             }
             router.refresh()
             setTimeout(() => {
               if (active) setJustCompletedMsg(null)
-            }, 5000)
+            }, 6000)
           }
         }
       } catch {
