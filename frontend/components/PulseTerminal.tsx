@@ -222,7 +222,7 @@ export default function PulseTerminal({
     return assets.filter((a) => {
       if (categoryFilter === 'watchlist') return watchlist.includes(a.topic.slug)
       if (categoryFilter === 'divergences') {
-        return a.divergence_flag || a.history.slice(-7).some((h) => h.divergence_flag)
+        return a.divergence_flag || a.history.slice(-2).some((h) => h.divergence_flag)
       }
       if (categoryFilter !== 'all' && a.topic.category !== categoryFilter) return false
       return true

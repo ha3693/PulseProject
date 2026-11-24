@@ -386,8 +386,16 @@ class PulseIngestionOrchestrator:
                 d_neu = max(2, rng.randint(4, 9))
                 d_vol = d_pos + d_neu + d_neg
 
-            is_bull_div = s_idx >= 20.0 and daily_ret <= -0.01
-            is_bear_div = s_idx <= -15.0 and daily_ret >= 0.01
+            prev_slice = history[-3:]
+            avg_prev_sent = (
+                sum(x["pulse_index"] for x in prev_slice) / len(prev_slice)
+                if prev_slice
+                else s_idx
+            )
+            sent_delta = s_idx - avg_prev_sent
+
+            is_bull_div = daily_ret <= -0.015 and sent_delta >= 6.0 and s_idx >= 10.0
+            is_bear_div = daily_ret >= 0.015 and sent_delta <= -6.0 and s_idx <= 5.0
             divergence_flag = bool(is_bull_div or is_bear_div)
             divergence_type = "bullish_divergence" if is_bull_div else ("bearish_divergence" if is_bear_div else None)
 
@@ -590,9 +598,16 @@ class PulseIngestionOrchestrator:
                     noise = rng.uniform(-14.0, 14.0)
                     s_idx = max(-92.0, min(92.0, round(bias + wave + noise, 1)))
 
-                # Divergence detection per ARCHITECTURE.md section 3.2
-                is_bull_div = s_idx >= 20.0 and daily_ret <= -0.01
-                is_bear_div = s_idx <= -15.0 and daily_ret >= 0.01
+                # Divergence detection: require opposite momentum (price vs. 3-day sentiment delta)
+                prev_slice = history[-3:]
+                avg_prev_sent = (
+                    sum(x["pulse_index"] for x in prev_slice) / len(prev_slice)
+                    if prev_slice
+                    else s_idx
+                )
+                sent_delta = s_idx - avg_prev_sent
+                is_bull_div = daily_ret <= -0.015 and sent_delta >= 6.0 and s_idx >= 10.0
+                is_bear_div = daily_ret >= 0.015 and sent_delta <= -6.0 and s_idx <= 5.0
                 divergence_flag = bool(is_bull_div or is_bear_div)
                 divergence_type = "bullish_divergence" if is_bull_div else ("bearish_divergence" if is_bear_div else None)
 

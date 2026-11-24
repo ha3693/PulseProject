@@ -22,7 +22,7 @@ export default async function HomePage({
   const topBullish = sortedByBullish.slice(0, 4)
   const topBearish = [...assets].sort((a, b) => a.pulse_index - b.pulse_index).slice(0, 4)
   const divergenceAssets = assets.filter(
-    (a) => a.divergence_flag || a.history.slice(-5).some((h) => h.divergence_flag)
+    (a) => a.divergence_flag || a.history.slice(-2).some((h) => h.divergence_flag)
   )
 
   const avgMarketPulse =
