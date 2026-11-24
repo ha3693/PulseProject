@@ -253,28 +253,44 @@ export async function loadPulseTerminalData() {
     const contentRows = contentRes?.data || []
 
     if (topicRows.length > 0 && signalRows.length > 0) {
-      const dbAssets = buildAssetsFromSupabase(
-        topicRows,
-        signalRows,
-        priceRows,
-        contentRows,
-        fallbackSnapshot.assets || []
+      // Find the latest *real* multi-agent ingestion run (ignore pg_cron_rollup health checks)
+      const latestRealRun = runRows.find(
+        (r: any) =>
+          Array.isArray(r.agents_invoked) &&
+          !r.agents_invoked.includes('pg_cron_rollup') &&
+          Number(r.posts_ingested || 0) > 0
       )
 
-      if (dbAssets.length > 0) {
-        // Use the most recent ingestion run timestamp (prefer runs that ingested posts)
-        const latestIngestRun =
-          runRows.find((r: any) => Number(r.posts_ingested || 0) > 0) || runRows[0]
-        const latestDbTimestamp =
-          latestIngestRun?.completed_at ||
-          signalRows[signalRows.length - 1]?.created_at ||
-          fallbackSnapshot.generated_at
+      const maxSignalCreatedAt = signalRows.reduce((max: string, s: any) => {
+        const ts = s.created_at ? String(s.created_at) : ''
+        return ts > max ? ts : max
+      }, '')
 
-        snapshot = {
-          ...fallbackSnapshot,
-          generated_at: latestDbTimestamp,
-          data_source: 'supabase',
-          assets: dbAssets,
+      const latestDbTimestamp =
+        latestRealRun?.completed_at ||
+        maxSignalCreatedAt ||
+        fallbackSnapshot.generated_at
+
+      const dbDateMs = new Date(latestDbTimestamp).getTime()
+      const fbDateMs = new Date(fallbackSnapshot.generated_at).getTime()
+
+      // Only prefer Supabase over the local snapshot if Supabase is at least as fresh
+      if (Number.isNaN(fbDateMs) || dbDateMs >= fbDateMs) {
+        const dbAssets = buildAssetsFromSupabase(
+          topicRows,
+          signalRows,
+          priceRows,
+          contentRows,
+          fallbackSnapshot.assets || []
+        )
+
+        if (dbAssets.length > 0) {
+          snapshot = {
+            ...fallbackSnapshot,
+            generated_at: latestDbTimestamp,
+            data_source: 'supabase',
+            assets: dbAssets,
+          }
         }
       }
     }
