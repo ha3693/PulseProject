@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { loadPulseTerminalData } from '@/lib/data/loadPulseData'
 import { AssetSignal } from '@/components/PulseTerminal'
+import DataFreshnessBanner from '@/components/DataFreshnessBanner'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,14 +15,14 @@ export default async function HomePage({
     redirect(`/auth/callback?code=${encodeURIComponent(searchParams.code)}`)
   }
 
-  const { snapshot, user } = await loadPulseTerminalData()
+  const { snapshot, isRefreshing, user } = await loadPulseTerminalData()
   const assets: AssetSignal[] = snapshot?.assets || []
 
   const sortedByBullish = [...assets].sort((a, b) => b.pulse_index - a.pulse_index)
   const topBullish = sortedByBullish.slice(0, 4)
   const topBearish = [...assets].sort((a, b) => a.pulse_index - b.pulse_index).slice(0, 4)
   const divergenceAssets = assets.filter(
-    (a) => a.divergence_flag || a.history.slice(-5).some((h) => h.divergence_flag)
+    (a) => a.divergence_flag || a.history.slice(-2).some((h) => h.divergence_flag)
   )
 
   const avgMarketPulse =
@@ -89,7 +90,16 @@ export default async function HomePage({
         </div>
       </div>
 
-      <div className="container" style={{ paddingTop: '2.75rem', paddingBottom: '4.5rem' }}>
+      <div className="container" style={{ paddingTop: '1.75rem', paddingBottom: '4.5rem' }}>
+        <DataFreshnessBanner
+          lastUpdated={snapshot?.generated_at || new Date().toISOString()}
+          dataSource={snapshot?.data_source || 'supabase'}
+          initialIsRefreshing={isRefreshing}
+          refreshLabel="Refresh Live Prices (14 Stocks)"
+          refreshTopic="ALL"
+          refreshMode="prices_only"
+        />
+
         {/* 1. EXECUTIVE HERO BANNER */}
         <div
           className="card"

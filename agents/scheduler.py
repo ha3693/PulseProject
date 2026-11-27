@@ -17,6 +17,7 @@ import logging
 import argparse
 import urllib.request
 import urllib.error
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, List, Optional
@@ -305,6 +306,153 @@ class PulseIngestionOrchestrator:
         self.stocktwits_user_agent = StockTwitsUserAgent()
         self.bluesky_user_agent = BlueskyUserAgent()
 
+    def refresh_prices_only(
+        self,
+        topic_meta: Dict[str, Any],
+        existing_item: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Fast Yahoo-only price refresh for a topic, preserving existing sentiment & posts."""
+        ticker = topic_meta["ticker"]
+        slug = topic_meta["slug"]
+        live_bars = fetch_live_yahoo_ohlcv(ticker, days=252)
+        base_item = existing_item or {}
+
+        if not live_bars:
+            return base_item if base_item else {
+                "topic": topic_meta,
+                "pulse_index": float(topic_meta.get("sentiment_bias", 0.0)),
+                "finbert_index": float(topic_meta.get("sentiment_bias", 0.0)),
+                "latest_price": float(topic_meta.get("base_price", 0.0)),
+                "price_change": 0.0,
+                "price_change_pct": 0.0,
+                "positive_count": 0,
+                "neutral_count": 0,
+                "negative_count": 0,
+                "total_volume": 0,
+                "divergence_flag": False,
+                "divergence_type": None,
+                "synthesis": f"Live Yahoo Finance price snapshot for {topic_meta['name']} ({ticker}).",
+                "top_drivers": {"agent_scores": {}, "finbert_index": 0.0, "model_agreement_pct": 85.0, "positive_catalysts": [], "risk_factors": [], "top_themes": [], "sector": topic_meta.get("sector", "")},
+                "posts": [],
+                "history": [],
+            }
+
+        existing_hist_by_date = {
+            h.get("date"): h for h in base_item.get("history", []) if h.get("date")
+        }
+        pulse_index = float(base_item.get("pulse_index", topic_meta.get("sentiment_bias", 0.0)))
+        finbert_index = float(base_item.get("finbert_index", pulse_index))
+        pos_count = int(base_item.get("positive_count", 0))
+        neu_count = int(base_item.get("neutral_count", 0))
+        neg_count = int(base_item.get("negative_count", 0))
+        total_vol = int(base_item.get("total_volume", pos_count + neu_count + neg_count))
+
+        rng = random.Random(sum(ord(c) for c in slug) + 2026)
+        bias = topic_meta["sentiment_bias"]
+        history: List[Dict[str, Any]] = []
+        total_bars = len(live_bars)
+
+        for idx, bar in enumerate(live_bars):
+            day_offset = total_bars - 1 - idx
+            date_str = bar["date"]
+            close_p = bar["close_price"]
+            open_p = bar["open_price"]
+            high_p = bar["high_price"]
+            low_p = bar["low_price"]
+            volume = bar["volume"]
+
+            prev_p = history[-1]["close_price"] if history else open_p
+            daily_ret = round((close_p - prev_p) / prev_p, 5) if prev_p > 0 else 0.0
+
+            prev_bar = existing_hist_by_date.get(date_str)
+            if day_offset == 0:
+                s_idx = pulse_index
+                fb_idx = finbert_index
+                d_pos, d_neu, d_neg, d_vol = pos_count, neu_count, neg_count, total_vol
+            elif prev_bar:
+                s_idx = float(prev_bar.get("pulse_index", 0.0))
+                fb_idx = float(prev_bar.get("finbert_index", s_idx))
+                d_pos = int(prev_bar.get("positive_count", 0))
+                d_neu = int(prev_bar.get("neutral_count", 0))
+                d_neg = int(prev_bar.get("negative_count", 0))
+                d_vol = int(prev_bar.get("total_volume", d_pos + d_neu + d_neg))
+            else:
+                wave = math.sin(idx / 4.2) * 18.0
+                noise = rng.uniform(-14.0, 14.0)
+                s_idx = max(-92.0, min(92.0, round(bias + wave + noise, 1)))
+                fb_idx = round(s_idx * 0.93 + rng.uniform(-3.0, 3.0), 1)
+                d_pos = max(2, int(12 + (s_idx / 8.0) + rng.randint(-2, 3)))
+                d_neg = max(1, int(8 - (s_idx / 10.0) + rng.randint(-2, 2)))
+                d_neu = max(2, rng.randint(4, 9))
+                d_vol = d_pos + d_neu + d_neg
+
+            prev_slice = history[-3:]
+            avg_prev_sent = (
+                sum(x["pulse_index"] for x in prev_slice) / len(prev_slice)
+                if prev_slice
+                else s_idx
+            )
+            sent_delta = s_idx - avg_prev_sent
+
+            is_bull_div = daily_ret <= -0.015 and sent_delta >= 6.0 and s_idx >= 10.0
+            is_bear_div = daily_ret >= 0.015 and sent_delta <= -6.0 and s_idx <= 5.0
+            divergence_flag = bool(is_bull_div or is_bear_div)
+            divergence_type = "bullish_divergence" if is_bull_div else ("bearish_divergence" if is_bear_div else None)
+
+            history.append({
+                "date": date_str,
+                "open_price": open_p,
+                "close_price": close_p,
+                "high_price": high_p,
+                "low_price": low_p,
+                "volume": volume,
+                "daily_return": daily_ret,
+                "change_pct": round(daily_ret * 100.0, 2),
+                "pulse_index": s_idx,
+                "finbert_index": fb_idx,
+                "positive_count": d_pos,
+                "neutral_count": d_neu,
+                "negative_count": d_neg,
+                "total_volume": d_vol,
+                "divergence_flag": divergence_flag,
+                "divergence_type": divergence_type,
+            })
+
+        latest_bar = history[-1]
+        prev_bar = history[-2] if len(history) > 1 else latest_bar
+        latest_price = latest_bar["close_price"]
+        price_change = round(latest_price - prev_bar["close_price"], 2)
+        price_change_pct = round((price_change / prev_bar["close_price"]) * 100.0, 2) if prev_bar["close_price"] > 0 else 0.0
+
+        updated = dict(base_item)
+        updated.update({
+            "topic": base_item.get("topic") or topic_meta,
+            "pulse_index": pulse_index,
+            "finbert_index": finbert_index,
+            "positive_count": pos_count,
+            "neutral_count": neu_count,
+            "negative_count": neg_count,
+            "total_volume": total_vol,
+            "latest_price": latest_price,
+            "price_change": price_change,
+            "price_change_pct": price_change_pct,
+            "divergence_flag": latest_bar["divergence_flag"],
+            "divergence_type": latest_bar["divergence_type"],
+            "synthesis": base_item.get("synthesis") or f"Live Yahoo Finance price update for {topic_meta['name']} ({ticker}): ${latest_price} ({price_change_pct:+.2f}%).",
+            "top_drivers": base_item.get("top_drivers") or {
+                "agent_scores": {},
+                "finbert_index": finbert_index,
+                "model_agreement_pct": 85.0,
+                "positive_catalysts": [],
+                "risk_factors": [],
+                "top_themes": [],
+                "sector": topic_meta.get("sector", ""),
+            },
+            "posts": base_item.get("posts", []),
+            "history": history,
+        })
+        return updated
+
     def run_for_topic(self, topic_meta: Dict[str, Any]) -> Dict[str, Any]:
         """Run all 5 market agents for a single topic and synthesize unified metrics."""
         ticker = topic_meta["ticker"]
@@ -450,9 +598,16 @@ class PulseIngestionOrchestrator:
                     noise = rng.uniform(-14.0, 14.0)
                     s_idx = max(-92.0, min(92.0, round(bias + wave + noise, 1)))
 
-                # Divergence detection per ARCHITECTURE.md section 3.2
-                is_bull_div = s_idx >= 20.0 and daily_ret <= -0.01
-                is_bear_div = s_idx <= -15.0 and daily_ret >= 0.01
+                # Divergence detection: require opposite momentum (price vs. 3-day sentiment delta)
+                prev_slice = history[-3:]
+                avg_prev_sent = (
+                    sum(x["pulse_index"] for x in prev_slice) / len(prev_slice)
+                    if prev_slice
+                    else s_idx
+                )
+                sent_delta = s_idx - avg_prev_sent
+                is_bull_div = daily_ret <= -0.015 and sent_delta >= 6.0 and s_idx >= 10.0
+                is_bear_div = daily_ret >= 0.015 and sent_delta <= -6.0 and s_idx <= 5.0
                 divergence_flag = bool(is_bull_div or is_bear_div)
                 divergence_type = "bullish_divergence" if is_bull_div else ("bearish_divergence" if is_bear_div else None)
 
@@ -626,11 +781,55 @@ class PulseIngestionOrchestrator:
             },
         ]
 
+    def _start_run_record(self, trigger_source: str, topic_filter: Optional[str]) -> Optional[str]:
+        """Insert a 'running' row in scheduled_ingestion_runs so all clients see the active refresh."""
+        note = f"Live refresh in progress ({topic_filter.upper() if topic_filter else 'ALL 14 Topics'})..."
+        sql = f"""
+        INSERT INTO public.scheduled_ingestion_runs (
+            trigger_source, status, topics_processed, posts_ingested, signals_updated,
+            agents_invoked, duration_ms, summary_notes, started_at, completed_at
+        ) VALUES (
+            {_sql_escape(trigger_source)},
+            'running',
+            0, 0, 0,
+            ARRAY['yahoo', 'reddit', 'stocktwits', 'bluesky', 'gdelt'],
+            0,
+            {_sql_escape(note)},
+            NOW(),
+            NOW()
+        )
+        RETURNING id::text;
+        """
+        try:
+            res = execute_supabase_sql(sql)
+            if isinstance(res, list) and res and isinstance(res[0], dict):
+                return res[0].get("id")
+        except Exception as e:
+            logger.warning(f"Could not insert running status in Supabase: {e}")
+        return None
+
+    def _fail_run_record(self, run_id: Optional[str], error_msg: str) -> None:
+        if not run_id:
+            return
+        sql = f"""
+        UPDATE public.scheduled_ingestion_runs
+        SET status = 'failed',
+            summary_notes = {_sql_escape(f'Refresh failed: {error_msg[:300]}')},
+            completed_at = NOW()
+        WHERE id = {_sql_escape(run_id)}::uuid;
+        """
+        try:
+            execute_supabase_sql(sql)
+        except Exception:
+            pass
+
     def sync_to_supabase(
         self,
         results: List[Dict[str, Any]],
         trigger_source: str = "scheduled_cron",
         duration_ms: int = 1250,
+        run_id: Optional[str] = None,
+        prices_only: bool = False,
     ) -> bool:
         """Persist topics, raw_content, sentiment_items, recent daily signals, and prices to Supabase."""
         logger.info("🗄️ Syncing multi-agent ingestion batch to Supabase PostgreSQL...")
@@ -656,28 +855,31 @@ class PulseIngestionOrchestrator:
                 is_active = true;
             """)
 
-            # 2. Upsert Raw Content & Sentiment Items
-            for p in item["posts"]:
-                total_posts += 1
-                tags_array = "ARRAY[" + ", ".join(_sql_escape(tag) for tag in p.get("theme_tags", [])) + "]::text[]"
-                statements.append(f"""
-                WITH upserted_content AS (
-                    INSERT INTO public.raw_content (topic_id, source, external_id, url, title, content_text, published_at, engagement_count)
-                    SELECT id, {_sql_escape(p['source'])}, {_sql_escape(p['external_id'])}, {_sql_escape(p['url'])}, {_sql_escape(p['title'])}, {_sql_escape(p['content_text'])}, {_sql_escape(p['published_at'])}::timestamptz, {int(p['engagement_count'])}
-                    FROM public.topics WHERE slug = {_sql_escape(slug)}
-                    ON CONFLICT (source, external_id) DO UPDATE SET
-                        engagement_count = EXCLUDED.engagement_count,
-                        title = EXCLUDED.title
-                    RETURNING id
-                )
-                INSERT INTO public.sentiment_items (content_id, sentiment_label, confidence, sentiment_score, theme_tags, model_version)
-                SELECT id, {_sql_escape(p['sentiment_label'])}, {float(p['confidence'])}, {float(p['sentiment_score'])}, {tags_array}, 'hybrid-finbert-v1'
-                FROM upserted_content;
-                """)
+            # 2. Upsert Raw Content & Sentiment Items (skip during fast prices-only refresh)
+            if not prices_only:
+                for p in item["posts"]:
+                    total_posts += 1
+                    tags_array = "ARRAY[" + ", ".join(_sql_escape(tag) for tag in p.get("theme_tags", [])) + "]::text[]"
+                    statements.append(f"""
+                    WITH upserted_content AS (
+                        INSERT INTO public.raw_content (topic_id, source, external_id, url, title, content_text, published_at, engagement_count)
+                        SELECT id, {_sql_escape(p['source'])}, {_sql_escape(p['external_id'])}, {_sql_escape(p['url'])}, {_sql_escape(p['title'])}, {_sql_escape(p['content_text'])}, {_sql_escape(p['published_at'])}::timestamptz, {int(p['engagement_count'])}
+                        FROM public.topics WHERE slug = {_sql_escape(slug)}
+                        ON CONFLICT (source, external_id) DO UPDATE SET
+                            engagement_count = EXCLUDED.engagement_count,
+                            title = EXCLUDED.title
+                        RETURNING id
+                    )
+                    INSERT INTO public.sentiment_items (content_id, sentiment_label, confidence, sentiment_score, theme_tags, model_version)
+                    SELECT id, {_sql_escape(p['sentiment_label'])}, {float(p['confidence'])}, {float(p['sentiment_score'])}, {tags_array}, 'hybrid-finbert-v1'
+                    FROM upserted_content;
+                    """)
+            else:
+                total_posts += len(item.get("posts", []))
 
-            # 3. Upsert recent 30-day Historical Daily Sentiment Signals & Asset Prices (full 252-day series stored in snapshot)
+            # 3. Upsert Historical Daily Sentiment Signals & Asset Prices (last 5 days for fast prices_only, 30 days for full)
             drivers_json = _sql_escape(json.dumps(item["top_drivers"]))
-            recent_hist = item["history"][-30:]
+            recent_hist = item["history"][-5:] if prices_only else item["history"][-30:]
             for idx, h in enumerate(recent_hist):
                 total_signals += len(item["history"]) if idx == 0 else 0
                 is_latest = idx == len(recent_hist) - 1
@@ -722,25 +924,38 @@ class PulseIngestionOrchestrator:
                     daily_return = EXCLUDED.daily_return;
                 """)
 
-        # 4. Record Scheduled Ingestion Run Audit Entry
+        # 4. Record or Update Scheduled Ingestion Run Audit Entry
         notes = f"Ingested {len(results)} topics, {total_posts} multi-agent posts, and {total_signals} historical daily signal/price bars."
-        statements.append(f"""
-        INSERT INTO public.scheduled_ingestion_runs (
-            trigger_source, status, topics_processed, posts_ingested, signals_updated,
-            agents_invoked, duration_ms, summary_notes, started_at, completed_at
-        ) VALUES (
-            {_sql_escape(trigger_source)},
-            'completed',
-            {len(results)},
-            {total_posts},
-            {total_signals},
-            ARRAY['yahoo', 'reddit', 'stocktwits', 'bluesky', 'gdelt'],
-            {int(duration_ms)},
-            {_sql_escape(notes)},
-            NOW() - INTERVAL '{int(duration_ms)} milliseconds',
-            NOW()
-        );
-        """)
+        if run_id:
+            statements.append(f"""
+            UPDATE public.scheduled_ingestion_runs
+            SET status = 'completed',
+                topics_processed = {len(results)},
+                posts_ingested = {total_posts},
+                signals_updated = {total_signals},
+                duration_ms = {int(duration_ms)},
+                summary_notes = {_sql_escape(notes)},
+                completed_at = NOW()
+            WHERE id = {_sql_escape(run_id)}::uuid;
+            """)
+        else:
+            statements.append(f"""
+            INSERT INTO public.scheduled_ingestion_runs (
+                trigger_source, status, topics_processed, posts_ingested, signals_updated,
+                agents_invoked, duration_ms, summary_notes, started_at, completed_at
+            ) VALUES (
+                {_sql_escape(trigger_source)},
+                'completed',
+                {len(results)},
+                {total_posts},
+                {total_signals},
+                ARRAY['yahoo', 'reddit', 'stocktwits', 'bluesky', 'gdelt'],
+                {int(duration_ms)},
+                {_sql_escape(notes)},
+                NOW() - INTERVAL '{int(duration_ms)} milliseconds',
+                NOW()
+            );
+            """)
 
         statements.append("COMMIT;")
         full_sql = "\n".join(statements)
@@ -758,8 +973,9 @@ class PulseIngestionOrchestrator:
         topic_filter: Optional[str] = None,
         trigger_source: str = "scheduled_cron",
         sync_db: bool = True,
+        prices_only: bool = False,
     ) -> Dict[str, Any]:
-        """Run full or filtered ingestion pipeline and write snapshot."""
+        """Run full, single-topic, or fast Yahoo prices-only pipeline and write snapshot."""
         t0 = time.time()
         selected_topics = CORE_TOPICS
         if topic_filter:
@@ -771,37 +987,97 @@ class PulseIngestionOrchestrator:
             if filtered:
                 selected_topics = filtered
 
-        results = [self.run_for_topic(t) for t in selected_topics]
-        social_radar = self.run_social_radar()
-        duration_ms = int((time.time() - t0) * 1000)
-
-        db_synced = False
-        if sync_db:
-            db_synced = self.sync_to_supabase(results, trigger_source=trigger_source, duration_ms=duration_ms)
-
-        # Save JSON snapshot for Next.js frontend
         snapshot_dir = ROOT_DIR / "frontend" / "lib" / "data"
         snapshot_path = snapshot_dir / "pulse_snapshot.json"
+        existing_topics_map: Dict[str, Any] = {}
+        existing_social_radar: List[Dict[str, Any]] = []
+        if snapshot_path.exists():
+            try:
+                with open(snapshot_path, "r", encoding="utf-8") as f:
+                    old_snap = json.load(f)
+                    existing_social_radar = old_snap.get("social_radar", [])
+                    if topic_filter or prices_only:
+                        for item in old_snap.get("assets", []):
+                            existing_topics_map[item["topic"]["slug"]] = item
+            except Exception:
+                pass
+
+        # On Vercel (where frontend/ is excluded), seed existing sentiment from Supabase if needed
+        if prices_only and not existing_topics_map and sync_db:
+            try:
+                rows = execute_supabase_sql("""
+                SELECT DISTINCT ON (t.slug)
+                    t.slug, d.pulse_index, d.positive_count, d.neutral_count,
+                    d.negative_count, d.total_volume, d.summary_text, d.top_drivers
+                FROM public.daily_sentiment_signals d
+                JOIN public.topics t ON t.id = d.topic_id
+                ORDER BY t.slug, d.signal_date DESC;
+                """)
+                if isinstance(rows, list):
+                    for r in rows:
+                        slug = r.get("slug")
+                        if not slug:
+                            continue
+                        td = r.get("top_drivers") or {}
+                        existing_topics_map[slug] = {
+                            "pulse_index": float(r.get("pulse_index") or 0.0),
+                            "finbert_index": float(td.get("finbert_index") or r.get("pulse_index") or 0.0),
+                            "positive_count": int(r.get("positive_count") or 0),
+                            "neutral_count": int(r.get("neutral_count") or 0),
+                            "negative_count": int(r.get("negative_count") or 0),
+                            "total_volume": int(r.get("total_volume") or 0),
+                            "synthesis": r.get("summary_text") or "",
+                            "top_drivers": td,
+                            "posts": [],
+                            "history": [],
+                        }
+            except Exception as e:
+                logger.warning(f"Could not seed sentiment from Supabase for prices_only: {e}")
+
+        run_id = self._start_run_record(
+            trigger_source,
+            "PRICES_ONLY" if prices_only and not topic_filter else topic_filter,
+        ) if sync_db else None
+        try:
+            if prices_only:
+                logger.info(f"⚡ Running fast Yahoo Finance price-only refresh for {len(selected_topics)} topics...")
+                with ThreadPoolExecutor(max_workers=7) as pool:
+                    results = list(
+                        pool.map(
+                            lambda t: self.refresh_prices_only(t, existing_topics_map.get(t["slug"])),
+                            selected_topics,
+                        )
+                    )
+                social_radar = existing_social_radar or self.run_social_radar()
+            else:
+                results = [self.run_for_topic(t) for t in selected_topics]
+                social_radar = self.run_social_radar()
+
+            duration_ms = int((time.time() - t0) * 1000)
+
+            db_synced = False
+            if sync_db:
+                db_synced = self.sync_to_supabase(
+                    results,
+                    trigger_source=trigger_source,
+                    duration_ms=duration_ms,
+                    run_id=run_id,
+                    prices_only=prices_only,
+                )
+        except Exception as exc:
+            self._fail_run_record(run_id, str(exc))
+            raise
+
+        # Save JSON snapshot for Next.js frontend
         try:
             snapshot_dir.mkdir(parents=True, exist_ok=True)
         except OSError:
             snapshot_path = Path("/tmp/pulse_snapshot.json")
 
-        # If partial topic run, merge into existing snapshot if present
-        existing_topics_map: Dict[str, Any] = {}
-        if topic_filter and snapshot_path.exists():
-            try:
-                with open(snapshot_path, "r", encoding="utf-8") as f:
-                    old_snap = json.load(f)
-                    for item in old_snap.get("assets", []):
-                        existing_topics_map[item["topic"]["slug"]] = item
-            except Exception:
-                pass
-
         for item in results:
             existing_topics_map[item["topic"]["slug"]] = item
 
-        final_assets = list(existing_topics_map.values()) if existing_topics_map else results
+        final_assets = list(existing_topics_map.values()) if (topic_filter or prices_only) and existing_topics_map else results
 
         snapshot_payload = {
             "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -833,6 +1109,7 @@ def main():
     parser.add_argument("--daemon", action="store_true", help="Run continuously on a recurring schedule")
     parser.add_argument("--interval", type=int, default=21600, help="Daemon interval in seconds (default: 6h = 21600s)")
     parser.add_argument("--no-db", action="store_true", help="Skip Supabase DB sync (local snapshot only)")
+    parser.add_argument("--prices-only", action="store_true", help="Fast Yahoo Finance price-only refresh (skip news/social/LLM)")
     parser.add_argument("--mock", action="store_true", help="Use deterministic synthetic mock feeds instead of live APIs")
 
     args = parser.parse_args()
@@ -853,6 +1130,7 @@ def main():
             topic_filter=args.topic,
             trigger_source=args.trigger,
             sync_db=not args.no_db,
+            prices_only=args.prices_only,
         )
         print(json.dumps({
             "status": "completed",

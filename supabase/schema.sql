@@ -309,15 +309,29 @@ BEGIN
     SELECT count(*) INTO v_posts_count FROM public.raw_content;
     SELECT count(*) INTO v_signals_count FROM public.daily_sentiment_signals;
 
-    -- Re-evaluate divergence flags where price and sentiment move in opposite directions
+    -- Re-evaluate divergence flags where price and 3-day sentiment momentum move in opposite directions
+    WITH signal_momentum AS (
+        SELECT
+            id,
+            topic_id,
+            signal_date,
+            pulse_index,
+            AVG(pulse_index) OVER (
+                PARTITION BY topic_id
+                ORDER BY signal_date
+                ROWS BETWEEN 3 PRECEDING AND 1 PRECEDING
+            ) AS prev_3d_avg
+        FROM public.daily_sentiment_signals
+    )
     UPDATE public.daily_sentiment_signals dss
     SET divergence_flag = CASE
-        WHEN (dss.pulse_index >= 20 AND ap.daily_return <= -0.01) THEN true
-        WHEN (dss.pulse_index <= -20 AND ap.daily_return >= 0.01) THEN true
-        ELSE dss.divergence_flag
+        WHEN (ap.daily_return <= -0.015 AND (sm.pulse_index - COALESCE(sm.prev_3d_avg, sm.pulse_index)) >= 6.0 AND sm.pulse_index >= 10.0) THEN true
+        WHEN (ap.daily_return >= 0.015 AND (sm.pulse_index - COALESCE(sm.prev_3d_avg, sm.pulse_index)) <= -6.0 AND sm.pulse_index <= 5.0) THEN true
+        ELSE false
     END
-    FROM public.asset_prices ap
-    WHERE dss.topic_id = ap.topic_id
+    FROM public.asset_prices ap, signal_momentum sm
+    WHERE dss.id = sm.id
+      AND dss.topic_id = ap.topic_id
       AND dss.signal_date = ap.price_date;
 
     INSERT INTO public.scheduled_ingestion_runs (
