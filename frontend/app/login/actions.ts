@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
+import { headers } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 
 async function confirmAndEnsureProfileInSupabase(email: string, password?: string, fullName?: string) {
@@ -95,8 +96,14 @@ export async function signup(formData: FormData) {
     redirect('/login?error=Password must be at least 6 characters')
   }
 
+  const hdrs = await headers()
+  const host = hdrs.get('x-forwarded-host') || hdrs.get('host')
+  const proto = hdrs.get('x-forwarded-proto') || (host?.includes('localhost') ? 'http' : 'https')
+
   const siteUrl =
     process.env.NEXT_PUBLIC_SITE_URL ||
+    (host ? `${proto}://${host}` : null) ||
+    (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : null) ||
     (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000')
 
   const { data, error } = await supabase.auth.signUp({
