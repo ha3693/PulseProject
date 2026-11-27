@@ -267,9 +267,9 @@ export async function loadPulseTerminalData() {
       // Find the latest *real* multi-agent ingestion run (ignore pg_cron_rollup health checks)
       const latestRealRun = runRows.find(
         (r: any) =>
-          Array.isArray(r.agents_invoked) &&
-          !r.agents_invoked.includes('pg_cron_rollup') &&
-          Number(r.posts_ingested || 0) > 0
+          (!Array.isArray(r.agents_invoked) || !r.agents_invoked.includes('pg_cron_rollup')) &&
+          r.status === 'completed' &&
+          Number(r.topics_processed || 0) > 0
       )
 
       const maxSignalCreatedAt = signalRows.reduce((max: string, s: any) => {

@@ -45,7 +45,7 @@ function detectActiveRun(runs: any[]): { isRunning: boolean; activeRun: any | nu
       Date.now() - new Date(latestReal.started_at || latestReal.completed_at).getTime() < TEN_MINUTES_MS
   )
   const latestCompleted = realRuns.find(
-    (r: any) => r.status === 'completed' && Number(r.posts_ingested || 0) > 0
+    (r: any) => r.status === 'completed' && Number(r.topics_processed || 0) > 0
   )
   return {
     isRunning,
@@ -79,7 +79,7 @@ export async function GET() {
       activeRun: dbState.activeRun || (localState.running ? localState : null),
       latestCompletedAt: dbState.latestCompletedAt || snapshot?.generated_at || null,
       snapshotGeneratedAt: snapshot?.generated_at || null,
-      dbSynced: snapshot?.db_synced ?? null,
+      dbSynced: dbState.latestCompletedAt ? true : snapshot?.db_synced ?? null,
       runs: runs || [],
       snapshot,
     })
